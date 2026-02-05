@@ -1,2 +1,3 @@
-# fix-quiz-gameplay-scheduling-randomized-order-frequent-repeats-for-incorrect-ans
-Exported from Caffeine project: Replace translation help/flag button with funny bold “Plan‑B” sign
+## 
+
+To run app build and run docker image: `docker build -t app . docker run -it --network host app`

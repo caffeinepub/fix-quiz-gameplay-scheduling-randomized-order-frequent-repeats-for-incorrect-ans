@@ -1,0 +1,199 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 55,
+  "summary": "ICP (Internet Computer) full-stack Motoko + React app scaffold with Internet Identity authentication/authorization, profile setup, an adaptive quiz experience (editor, gameplay, results), and PDF import tooling for quiz question extraction—packaged with a reusable build/deploy template and shared UI component library.",
+  "existing_features": [
+    {
+      "id": "IF-1",
+      "title": "Motoko backend canister scaffold with main entrypoint",
+      "synonyms": [
+        "backend canister",
+        "Motoko service"
+      ],
+      "description": "Core Motoko backend canister structure wired via backend/main.mo and supporting modules.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-2",
+      "title": "Authorization & access control layer (Motoko)",
+      "synonyms": [
+        "authz",
+        "ACL",
+        "authorization mixin"
+      ],
+      "description": "Backend authorization modules including mixin-based authorization and access control utilities.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-3",
+      "title": "React frontend scaffold (Vite) with Tailwind styling",
+      "synonyms": [
+        "frontend app",
+        "Vite React"
+      ],
+      "description": "React/Vite frontend app structure with Tailwind configuration and global styling.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-4",
+      "title": "Internet Identity login integration",
+      "synonyms": [
+        "II auth",
+        "Internet Identity"
+      ],
+      "description": "Frontend hooks/components for authenticating via Internet Identity and creating an authenticated actor to call the backend canister.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-5",
+      "title": "Profile setup UI",
+      "synonyms": [
+        "user onboarding",
+        "profile form"
+      ],
+      "description": "Frontend profile setup flow and related UI components.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-6",
+      "title": "Quiz editor",
+      "synonyms": [
+        "quiz authoring"
+      ],
+      "description": "UI for creating/editing quizzes with validation utilities and type definitions.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-7",
+      "title": "Quiz gameplay flow",
+      "synonyms": [
+        "quiz runner"
+      ],
+      "description": "UI and logic for playing a quiz session, including session types and scheduling support.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-8",
+      "title": "Quiz results view",
+      "synonyms": [
+        "results screen"
+      ],
+      "description": "UI for presenting quiz outcomes/results after gameplay.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-9",
+      "title": "Adaptive scheduling logic for quizzes",
+      "synonyms": [
+        "adaptive scheduler",
+        "spaced repetition"
+      ],
+      "description": "Adaptive scheduler module used to drive quiz session behavior.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-10",
+      "title": "Frontend-to-backend canister bindings and actor utilities",
+      "synonyms": [
+        "did bindings",
+        "agent actor"
+      ],
+      "description": "Generated DID JS/TS bindings and frontend helpers (useActor/useQueries/backend client) to call the backend canister.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-11",
+      "title": "Reusable UI component library (shadcn/ui set)",
+      "synonyms": [
+        "component kit",
+        "UI primitives"
+      ],
+      "description": "A large set of reusable UI primitives/components under build-template/src/frontend/src/components/ui used by the app/template.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-12",
+      "title": "Build/deploy template for ICP project export",
+      "synonyms": [
+        "build template",
+        "Docker/deploy scripts",
+        "icp.yaml"
+      ],
+      "description": "Project build template including Dockerfile, deploy script, canister yamls, workspace tooling, and image tooling scripts.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "IF-13",
+      "title": "PDF import for quiz question extraction (frontend)",
+      "synonyms": [
+        "PDF quiz import",
+        "PDF-to-questions",
+        "pdfImport"
+      ],
+      "description": "Frontend PDF import flow including text extraction, parsing, preview, and typed structures to convert PDF content into quiz questions usable by the quiz editor.",
+      "reqIds": [],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-translation-press-and-hold-control-in-frontend-src-quiz-quizgameplay-tsx-currently-the-english-flag-icon-with-the-small-hilfe-label-to-display-a-funny-looking-bold-plan-b-sign-style-text-instead-of-the-flag-image-and-hilfe",
+      "title": "Update the translation press-and-hold control in `frontend/src/quiz/QuizGameplay.tsx` (currently the English-flag icon with the small \"hilfe\" label) to display a funny-looking, bold \"Plan-B\" sign-style text instead of the flag image and \"hilfe\".",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-preserve-existing-translation-behavior-for-the-control-press-hold-shows-translation-release-hides-it-including-disabled-loading-behavior-while-translating-after-swapping-the-ui-to-plan-b",
+      "title": "Preserve existing translation behavior for the control (press/hold shows translation; release hides it), including disabled/loading behavior while translating, after swapping the UI to \"Plan-B\".",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-user-facing-text-associated-with-the-control-is-in-english-e-g-tooltip-title-aria-label-and-reflects-the-new-plan-b-presentation-while-still-communicating-the-action-press-and-hold-to-translate-to-english",
+      "title": "Ensure user-facing text associated with the control is in English (e.g., tooltip/title/aria-label) and reflects the new \"Plan-B\" presentation while still communicating the action (press and hold to translate to English).",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Change the right-side translation toggle (hilfe/flag) control to a funny-looking bold \"Plan-B\" text/sign instead of the English-flag icon + \"hilfe\" label.",
+      "reqIds": [],
+      "status": "pending"
+    }
+  ],
+  "architectural_notes": [
+    "Architecture: Internet Computer app with Motoko backend canister and React/Vite frontend.",
+    "Auth: Internet Identity used for user authentication; frontend creates authenticated canister actors.",
+    "Backend includes modular authorization/access-control helpers.",
+    "Frontend uses Tailwind + shadcn/ui component primitives.",
+    "Quiz domain split into editor, gameplay, results with shared types/validation and an adaptive scheduler.",
+    "Includes reusable build/export template with deploy scripts and canister configuration (icp.yaml, canister.yaml).",
+    "Quiz editor includes a PDF import pipeline (text extraction -> parsing -> preview -> typed question structures) to bootstrap quizzes from PDFs.",
+    "Build template now includes monorepo workspace plumbing (pnpm-workspace), frontend tooling configs (ESLint config + custom rules, Vite/Tailwind/PostCSS), and standardized canister.yaml/env.json scaffolding.",
+    "Build template adds image maintenance scripts (prune-unused-images, resize-images) and refreshed deploy/build scripts/Dockerfile for exportable ICP projects.",
+    "Components updated/standardized: authorization layer v4.0.0; core infrastructure v1.0.2; shadcn/ui set v1.0.0; build-template-react v1.0.0; initial-app v1.0.0; github-export-icp-cli v1.0.0."
+  ],
+  "known_issues": [],
+  "isFixRequest": false,
+  "projectName": "Replace translation help/flag button with funny bold “Plan‑B” sign",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}

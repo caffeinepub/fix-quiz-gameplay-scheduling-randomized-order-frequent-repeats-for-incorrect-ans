@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --radius: 0.75rem;
+        /* Warm educational theme - oranges and greens */
+        --background: 0.98 0.01 85;
+        --foreground: 0.25 0.02 65;
+        --card: 1 0 0;
+        --card-foreground: 0.25 0.02 65;
+        --popover: 1 0 0;
+        --popover-foreground: 0.25 0.02 65;
+        /* Primary: Warm orange */
+        --primary: 0.65 0.18 45;
+        --primary-foreground: 0.98 0.01 85;
+        /* Secondary: Soft green */
+        --secondary: 0.88 0.08 150;
+        --secondary-foreground: 0.25 0.02 65;
+        --muted: 0.95 0.01 85;
+        --muted-foreground: 0.55 0.02 65;
+        /* Accent: Energetic coral */
+        --accent: 0.72 0.15 35;
+        --accent-foreground: 0.98 0.01 85;
+        --destructive: 0.55 0.22 25;
+        --destructive-foreground: 0.98 0 0;
+        --border: 0.90 0.01 85;
+        --input: 0.90 0.01 85;
+        --ring: 0.65 0.18 45;
+        --chart-1: 0.65 0.18 45;
+        --chart-2: 0.70 0.12 140;
+        --chart-3: 0.75 0.15 60;
+        --chart-4: 0.60 0.20 30;
+        --chart-5: 0.68 0.10 160;
+        --sidebar: 0.98 0.01 85;
+        --sidebar-foreground: 0.25 0.02 65;
+        --sidebar-primary: 0.65 0.18 45;
+        --sidebar-primary-foreground: 0.98 0.01 85;
+        --sidebar-accent: 0.95 0.01 85;
+        --sidebar-accent-foreground: 0.25 0.02 65;
+        --sidebar-border: 0.90 0.01 85;
+        --sidebar-ring: 0.65 0.18 45;
+        /* Success state for correct answers */
+        --success: 0.70 0.15 140;
+        --success-foreground: 0.98 0 0;
+    }
+
+    .dark {
+        --background: 0.20 0.02 65;
+        --foreground: 0.95 0.01 85;
+        --card: 0.25 0.02 65;
+        --card-foreground: 0.95 0.01 85;
+        --popover: 0.22 0.02 65;
+        --popover-foreground: 0.95 0.01 85;
+        --primary: 0.70 0.18 45;
+        --primary-foreground: 0.15 0.02 65;
+        --secondary: 0.35 0.05 150;
+        --secondary-foreground: 0.95 0.01 85;
+        --muted: 0.30 0.02 65;
+        --muted-foreground: 0.65 0.02 65;
+        --accent: 0.75 0.15 35;
+        --accent-foreground: 0.15 0.02 65;
+        --destructive: 0.60 0.22 25;
+        --destructive-foreground: 0.95 0 0;
+        --border: 0.35 0.02 65;
+        --input: 0.35 0.02 65;
+        --ring: 0.70 0.18 45;
+        --chart-1: 0.70 0.18 45;
+        --chart-2: 0.75 0.12 140;
+        --chart-3: 0.80 0.15 60;
+        --chart-4: 0.65 0.20 30;
+        --chart-5: 0.73 0.10 160;
+        --sidebar: 0.25 0.02 65;
+        --sidebar-foreground: 0.95 0.01 85;
+        --sidebar-primary: 0.70 0.18 45;
+        --sidebar-primary-foreground: 0.15 0.02 65;
+        --sidebar-accent: 0.30 0.02 65;
+        --sidebar-accent-foreground: 0.95 0.01 85;
+        --sidebar-border: 0.35 0.02 65;
+        --sidebar-ring: 0.70 0.18 45;
+        --success: 0.75 0.15 140;
+        --success-foreground: 0.15 0.02 65;
+    }
+
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings: "rlig" 1, "calt" 1;
+    }
+}
+
+@layer utilities {
+    .success-bg {
+        background-color: oklch(var(--success));
+    }
+    .success-text {
+        color: oklch(var(--success));
+    }
+    .success-border {
+        border-color: oklch(var(--success));
+    }
+}

@@ -1,0 +1,62 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-update-the-translation-press-and-hold-control-in-frontend-src-quiz-quizgameplay-tsx-currently-the-english-flag-icon-with-the-small-hilfe-label-to-display-a-funny-looking-bold-plan-b-sign-style-text-instead-of-the-flag-image-and-hilfe",
+      "featureTitle": "Update the translation press-and-hold control in `frontend/src/quiz/QuizGameplay.tsx` (currently the English-flag icon with the small \"hilfe\" label) to display a funny-looking, bold \"Plan-B\" sign-style text instead of the flag image and \"hilfe\".",
+      "files": [
+        "frontend/src/quiz/QuizGameplay.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-preserve-existing-translation-behavior-for-the-control-press-hold-shows-translation-release-hides-it-including-disabled-loading-behavior-while-translating-after-swapping-the-ui-to-plan-b",
+      "featureTitle": "Preserve existing translation behavior for the control (press/hold shows translation; release hides it), including disabled/loading behavior while translating, after swapping the UI to \"Plan-B\".",
+      "files": [
+        "frontend/src/quiz/QuizGameplay.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-ensure-user-facing-text-associated-with-the-control-is-in-english-e-g-tooltip-title-aria-label-and-reflects-the-new-plan-b-presentation-while-still-communicating-the-action-press-and-hold-to-translate-to-english",
+      "featureTitle": "Ensure user-facing text associated with the control is in English (e.g., tooltip/title/aria-label) and reflects the new \"Plan-B\" presentation while still communicating the action (press and hold to translate to English).",
+      "files": [
+        "frontend/src/quiz/QuizGameplay.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

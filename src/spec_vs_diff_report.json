@@ -1,0 +1,47 @@
+{
+  "kind": "spec_vs_diff_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-05T00:01:45.495Z",
+  "summary": "Diff shows partial updates in QuizGameplay.tsx and documentation/state files. The file summary claims the translation control is now a bold, funny \"Plan-B\" sign-like text button, but the actual relevant JSX/event-handler code is not visible in the truncated diff, so several acceptance criteria cannot be verified from provided evidence. Also, QuizGameplay.tsx adds a toast-based translation error display which was not requested.",
+  "missing_requirements": [
+    {
+      "id": "REQ-1",
+      "requirement": "Remove rendering of `/assets/generated/english-flag-icon-v2.dim_24x24.png` and the \"hilfe\" label, and replace with a funny bold \"Plan-B\" sign-style control in `frontend/src/quiz/QuizGameplay.tsx`.",
+      "reason": "The diff for `QuizGameplay.tsx` is truncated before the render section where the translation control would be defined. The provided snippet does not show removal of the flag image nor the \"hilfe\" label, nor does it show the new \"Plan-B\" control markup/styling.",
+      "evidence": [
+        "frontend/src/quiz/QuizGameplay.tsx (truncated)"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "requirement": "Preserve press-and-hold translation behavior (press/hold shows, release hides), including disabled/loading behavior while `isTranslating` is true.",
+      "reason": "The event handlers / component props for pointer/mouse/touch press-and-hold and the disabled/loading UI are not visible in the truncated `QuizGameplay.tsx` diff snippet. While `isTranslating` is imported from the hook, there is no shown usage proving the behavior is preserved.",
+      "evidence": [
+        "frontend/src/quiz/QuizGameplay.tsx (truncated)"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "requirement": "Ensure user-facing text for the control is in English and reflects \"Plan-B\" while communicating press-and-hold translation (tooltip/title/aria-label).",
+      "reason": "No tooltip/title/aria-label or visible control text is shown in the truncated snippet, so it cannot be confirmed that German text (e.g., \"hilfe\") is removed and replaced with English-accessible labeling.",
+      "evidence": [
+        "frontend/src/quiz/QuizGameplay.tsx (truncated)"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "Toast notification shown for translation errors (using `sonner`) and automatic clearing of the translation error state.",
+      "reason": "BuildRequest did not ask to add/modify error presentation; it specifically constrained changes to the UI of the translation button while preserving translation logic/behavior. The diff adds a new `useEffect` that displays `toast.error(translationError)` and calls `clearError()`.",
+      "evidence": [
+        "frontend/src/quiz/QuizGameplay.tsx (truncated)"
+      ]
+    }
+  ],
+  "confidence": 0.42,
+  "changed_files": [
+    "frontend-file-summaries.txt",
+    "frontend/src/quiz/QuizGameplay.tsx",
+    "project_state.json"
+  ]
+}

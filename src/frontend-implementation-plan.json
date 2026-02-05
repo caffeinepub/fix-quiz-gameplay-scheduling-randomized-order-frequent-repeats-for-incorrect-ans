@@ -1,0 +1,53 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Swap quiz translation control UI to a bold “Plan-B” sign while preserving press-and-hold behavior",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "summary": "Replace the flag + “hilfe” translation control UI with a funny, bold, sign-like “Plan-B” text treatment in QuizGameplay.",
+      "acceptanceCriteria": [
+        "The translation control no longer renders `/assets/generated/english-flag-icon-v2.dim_24x24.png` nor the \"hilfe\" label.",
+        "The control renders the text \"Plan-B\" with a visually distinct, sign-like styling (e.g., bold, bordered/badge-like treatment) that reads as intentionally funny.",
+        "The control remains located in the same place (right side of the question header area) and remains clickable/touchable."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "operation": "modify",
+          "description": "In the question header translation control, remove the flag <img> and the \"hilfe\" label. Replace them with a single \"Plan-B\" text element styled to read like a bold, funny sign (e.g., badge-like border, strong font weight, slightly playful/handmade feel via subtle rotation/uppercase/letterspacing using existing Tailwind utility classes). Keep the control in the same header location and preserve its button hit-area."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Keep the existing press/hold translation interaction and disabled/loading behavior while changing only the control’s visual presentation.",
+      "acceptanceCriteria": [
+        "Pointer/mouse/touch press-and-hold events continue to trigger translation exactly as before.",
+        "When `isTranslating` is true, the loading indicator still appears and the control is disabled (no translation toggling while disabled)."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "operation": "modify",
+          "description": "Ensure the translation control continues to use the existing press-and-hold event handlers (pointer/mouse/touch) and release/cancel handlers unchanged. Preserve the current disabled={isTranslating} behavior and keep showing the Loader2 spinner while translating; only swap the non-loading UI to the \"Plan-B\" sign text."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Make all user-facing text for the control English and aligned with the new “Plan-B” presentation while still communicating press-and-hold translation behavior.",
+      "acceptanceCriteria": [
+        "No German label (e.g., \"hilfe\") is shown for this control.",
+        "The control has an English tooltip/title and/or aria-label that communicates the press-and-hold translation action."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "operation": "modify",
+          "description": "Update the translation control’s accessible/user-facing strings to English and consistent with the new \"Plan-B\" UI (e.g., keep/update title and add/adjust aria-label to communicate \"Press and hold to translate to English\"). Remove any remaining German text related to the control."
+        }
+      ]
+    }
+  ]
+}

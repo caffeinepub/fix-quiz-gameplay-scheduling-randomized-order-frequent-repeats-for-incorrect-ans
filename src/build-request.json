@@ -1,0 +1,73 @@
+{
+  "kind": "build_request",
+  "title": "Replace translation help/flag button with funny bold “Plan‑B” sign",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Update the translation press-and-hold control in `frontend/src/quiz/QuizGameplay.tsx` (currently the English-flag icon with the small \"hilfe\" label) to display a funny-looking, bold \"Plan-B\" sign-style text instead of the flag image and \"hilfe\".",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "modify hilfe/flag button so that it is instead funny looking \"Plan-B\" text, funny sign with bold letters"
+        ]
+      },
+      "acceptanceCriteria": [
+        "The translation control no longer renders `/assets/generated/english-flag-icon-v2.dim_24x24.png` nor the \"hilfe\" label.",
+        "The control renders the text \"Plan-B\" with a visually distinct, sign-like styling (e.g., bold, bordered/badge-like treatment) that reads as intentionally funny.",
+        "The control remains located in the same place (right side of the question header area) and remains clickable/touchable."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Preserve existing translation behavior for the control (press/hold shows translation; release hides it), including disabled/loading behavior while translating, after swapping the UI to \"Plan-B\".",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "modify hilfe/flag button so that it is instead funny looking \"Plan-B\" text, funny sign with bold letters"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Pointer/mouse/touch press-and-hold events continue to trigger translation exactly as before.",
+        "When `isTranslating` is true, the loading indicator still appears and the control is disabled (no translation toggling while disabled)."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Ensure user-facing text associated with the control is in English (e.g., tooltip/title/aria-label) and reflects the new \"Plan-B\" presentation while still communicating the action (press and hold to translate to English).",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "Use English for any user-facing text in the build request."
+        ]
+      },
+      "acceptanceCriteria": [
+        "No German label (e.g., \"hilfe\") is shown for this control.",
+        "The control has an English tooltip/title and/or aria-label that communicates the press-and-hold translation action."
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not edit files under `frontend/src/components/ui` (compose existing components instead).",
+    "Keep backend unchanged; this is a frontend-only UI change.",
+    "Maintain the existing translation interaction model (press-and-hold to show, release to hide)."
+  ],
+  "nonGoals": [
+    "Do not change translation logic, caching behavior, or translation API configuration.",
+    "Do not add new authentication or routing changes.",
+    "Do not redesign unrelated parts of the quiz gameplay UI."
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}
