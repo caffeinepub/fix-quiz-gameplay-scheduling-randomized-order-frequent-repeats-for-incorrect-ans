@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "projectStateVersion": 55,
+  "projectStateVersion": 63,
   "summary": "ICP (Internet Computer) full-stack Motoko + React app scaffold with Internet Identity authentication/authorization, profile setup, an adaptive quiz experience (editor, gameplay, results), and PDF import tooling for quiz question extraction—packaged with a reusable build/deploy template and shared UI component library.",
   "existing_features": [
     {
@@ -147,26 +147,42 @@
       "version": 1
     },
     {
-      "id": "feature-update-the-translation-press-and-hold-control-in-frontend-src-quiz-quizgameplay-tsx-currently-the-english-flag-icon-with-the-small-hilfe-label-to-display-a-funny-looking-bold-plan-b-sign-style-text-instead-of-the-flag-image-and-hilfe",
-      "title": "Update the translation press-and-hold control in `frontend/src/quiz/QuizGameplay.tsx` (currently the English-flag icon with the small \"hilfe\" label) to display a funny-looking, bold \"Plan-B\" sign-style text instead of the flag image and \"hilfe\".",
+      "id": "feature-update-the-edit-questions-quizeditor-ui-to-support-organizing-questions-into-100-question-blocks-add-a-block-selector-that-lets-the-user-choose-which-100-question-block-they-are-viewing-editing-e-g-1-100-101-200-and-display-only-questions-within-the-selected-block-range-in-the-editor-list",
+      "title": "Update the Edit Questions (QuizEditor) UI to support organizing questions into 100-question blocks. Add a block selector that lets the user choose which 100-question block they are viewing/editing (e.g., \"1–100\", \"101–200\", ...), and display only questions within the selected block range in the editor list.",
       "reqIds": [
-        "REQ-1"
+        "REQ-12"
       ],
       "version": 1
     },
     {
-      "id": "feature-preserve-existing-translation-behavior-for-the-control-press-hold-shows-translation-release-hides-it-including-disabled-loading-behavior-while-translating-after-swapping-the-ui-to-plan-b",
-      "title": "Preserve existing translation behavior for the control (press/hold shows translation; release hides it), including disabled/loading behavior while translating, after swapping the UI to \"Plan-B\".",
+      "id": "feature-in-the-edit-questions-quizeditor-ui-add-the-ability-to-assign-an-individual-name-to-each-100-question-block-pattern-the-user-must-be-able-to-edit-save-the-name-for-the-currently-selected-block-persisted-via-the-backend-and-the-name-should-be-shown-in-the-block-selector-falling-back-to-the-numeric-range-if-unnamed",
+      "title": "In the Edit Questions (QuizEditor) UI, add the ability to assign an individual name to each 100-question block (pattern). The user must be able to edit/save the name for the currently selected block, persisted via the backend, and the name should be shown in the block selector (falling back to the numeric range if unnamed).",
       "reqIds": [
-        "REQ-2"
+        "REQ-13"
       ],
       "version": 1
     },
     {
-      "id": "feature-ensure-user-facing-text-associated-with-the-control-is-in-english-e-g-tooltip-title-aria-label-and-reflects-the-new-plan-b-presentation-while-still-communicating-the-action-press-and-hold-to-translate-to-english",
-      "title": "Ensure user-facing text associated with the control is in English (e.g., tooltip/title/aria-label) and reflects the new \"Plan-B\" presentation while still communicating the action (press and hold to translate to English).",
+      "id": "feature-update-the-edit-questions-quizeditor-add-question-behavior-so-that-when-a-block-is-selected-new-questions-are-added-into-that-block-context-i-e-appended-within-the-selected-block-s-range-rather-than-always-appended-to-the-very-end-of-the-full-quiz-if-inserting-would-split-later-blocks-reindexing-should-be-handled-consistently-by-using-the-underlying-question-array-order-as-the-source-of-truth",
+      "title": "Update the Edit Questions (QuizEditor) \"Add Question\" behavior so that when a block is selected, new questions are added into that block context (i.e., appended within the selected block’s range rather than always appended to the very end of the full quiz). If inserting would split later blocks, reindexing should be handled consistently by using the underlying question array order as the source of truth.",
       "reqIds": [
-        "REQ-3"
+        "REQ-14"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-quiz-gameplay-to-allow-the-user-to-select-which-named-100-question-block-pattern-to-play-before-starting-the-quiz-session-gameplay-must-load-and-run-the-quiz-only-on-the-questions-in-the-selected-block-and-the-selection-ui-must-display-block-names-with-numeric-range-fallback",
+      "title": "Update quiz gameplay to allow the user to select which named 100-question block (pattern) to play before starting the quiz session. Gameplay must load and run the quiz only on the questions in the selected block, and the selection UI must display block names (with numeric range fallback).",
+      "reqIds": [
+        "REQ-15"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-extend-react-query-hooks-to-support-1-fetching-a-specific-100-question-chunk-using-the-existing-backend-chunk-api-and-2-fetching-updating-block-pattern-names-for-a-quiz-use-these-hooks-in-quizeditor-and-quizgameplay",
+      "title": "Add/extend React Query hooks to support: (1) fetching a specific 100-question chunk using the existing backend chunk API, and (2) fetching/updating block (pattern) names for a quiz. Use these hooks in QuizEditor and QuizGameplay.",
+      "reqIds": [
+        "REQ-16"
       ],
       "version": 1
     }
@@ -174,8 +190,108 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Change the right-side translation toggle (hilfe/flag) control to a funny-looking bold \"Plan-B\" text/sign instead of the English-flag icon + \"hilfe\" label.",
+      "summary": "Add login/start options to prioritize previously weak/wrong-answered questions at the beginning of a new quiz session (per-user performance persistence).",
       "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Support grouping/splitting large question sets into selectable 100-question blocks for both editing and gameplay (user can choose which block/pattern to work on).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Persist per-user, per-quiz question performance so the app can recognize a returning user and identify previously weak questions (e.g., questions answered incorrectly) in later sessions.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Add backend APIs to record quiz session performance so the frontend can update the stored weak-question stats after gameplay.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Add a gameplay start option (user-facing text in English) to prioritize previously weak questions at the beginning of a quiz session, using the persisted performance data when available.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-6",
+      "summary": "Implement 100-question block selection for quiz gameplay so the user can choose which 100-question block to practice (e.g., 1–100, 101–200, etc.), and run the quiz only on that selected block.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-7",
+      "summary": "Implement 100-question block selection for the Edit Questions page so the user can filter/edit questions by 100-question blocks, and can switch blocks without losing unsaved edits (prompt user to save or discard changes).",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-8",
+      "summary": "Add backend support for efficient 100-question block workflows by enabling chunked read/write of questions for a quiz, so editing and gameplay can work with large quizzes without requiring full quiz loads.",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-9",
+      "summary": "Add backend persistence to remember, per authenticated user and per quizId, which question indexes were answered incorrectly, so that returning users can be recognized and their previously-wrong questions can be retrieved later.",
+      "reqIds": [
+        "REQ-7"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-10",
+      "summary": "Expose backend APIs to (1) fetch the stored wrong-answer question indexes for a given quizId and (2) update stored wrong-answer state when the user answers a question during gameplay (mark a question as wrong when answered incorrectly; remove it from the wrong list when answered correctly).",
+      "reqIds": [
+        "REQ-8"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-11",
+      "summary": "Update the quiz gameplay flow to fetch the stored wrong-answer question indexes at the start of the session and schedule those questions first before the rest of the quiz questions.",
+      "reqIds": [
+        "REQ-9"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-12",
+      "summary": "During quiz gameplay, record answer outcomes to the backend so the stored wrong-answer list stays up-to-date for the next session.",
+      "reqIds": [
+        "REQ-10"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-13",
+      "summary": "Allow users to assign custom names to 100-question blocks/patterns in the Edit Questions page, and make those named patterns selectable by the user in quiz gameplay.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-14",
+      "summary": "Add backend support for storing and retrieving per-user, per-quiz names for 100-question blocks (\"question patterns\"). Implement APIs to (1) fetch all saved block names for a quiz and (2) set/update a specific block name by its 0-based block index (blockIndex = 0 for questions 1–100, 1 for 101–200, etc.).",
+      "reqIds": [
+        "REQ-11"
+      ],
       "status": "pending"
     }
   ],
@@ -193,7 +309,7 @@
   ],
   "known_issues": [],
   "isFixRequest": false,
-  "projectName": "Replace translation help/flag button with funny bold “Plan‑B” sign",
+  "projectName": "Add weak-question prioritization across sessions + 100-question block selection for edit and play",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

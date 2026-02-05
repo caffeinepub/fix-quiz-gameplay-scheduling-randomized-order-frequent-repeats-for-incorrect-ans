@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useGetAllQuestions } from '../hooks/useQueries';
+import { useGetQuestionChunk, useGetQuestionCount, useGetAllBlockNames } from '../hooks/useQueries';
 import { useQuestionTranslation } from '../hooks/useQuestionTranslation';
 import { AdaptiveScheduler } from './adaptiveScheduler';
 import type { SessionState, QuestionPerformance } from './sessionTypes';
-import type { QuizId } from './types';
+import type { Question, QuizId } from './types';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
 import { CheckCircle, XCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
+import { getAvailableBlockIndices, getCombinedBlockLabel } from './blockUtils';
 
 interface QuizGameplayProps {
   quizId: QuizId;
@@ -19,7 +20,18 @@ interface QuizGameplayProps {
 }
 
 export default function QuizGameplay({ quizId, onComplete, onBack }: QuizGameplayProps) {
-  const { data: questions, isLoading } = useGetAllQuestions(quizId);
+  const { data: questionCountBigInt } = useGetQuestionCount(quizId);
+  const { data: blockNamesMap } = useGetAllBlockNames(quizId);
+  
+  const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null);
+  const [blockSelectionComplete, setBlockSelectionComplete] = useState(false);
+  
+  const { data: questions, isLoading: questionsLoading } = useGetQuestionChunk(
+    quizId,
+    selectedBlockIndex ?? 0,
+    blockSelectionComplete && selectedBlockIndex !== null
+  );
+  
   const { getTranslation, getCachedTranslation, isTranslating, error: translationError, clearError } = useQuestionTranslation();
   
   const [scheduler, setScheduler] = useState<AdaptiveScheduler | null>(null);
@@ -31,8 +43,11 @@ export default function QuizGameplay({ quizId, onComplete, onBack }: QuizGamepla
   const [showTranslation, setShowTranslation] = useState(false);
   const [translatedText, setTranslatedText] = useState<string | null>(null);
 
+  const totalQuestions = questionCountBigInt ? Number(questionCountBigInt) : 0;
+  const availableBlocks = getAvailableBlockIndices(totalQuestions);
+
   useEffect(() => {
-    if (questions && questions.length > 0) {
+    if (questions && questions.length > 0 && blockSelectionComplete) {
       const newScheduler = new AdaptiveScheduler(questions.length);
       setScheduler(newScheduler);
       
@@ -61,7 +76,7 @@ export default function QuizGameplay({ quizId, onComplete, onBack }: QuizGamepla
       setShowFeedback(false);
       setIsCorrect(false);
     }
-  }, [questions]);
+  }, [questions, blockSelectionComplete]);
 
   // Show translation error as toast
   useEffect(() => {
@@ -77,7 +92,77 @@ export default function QuizGameplay({ quizId, onComplete, onBack }: QuizGamepla
     setTranslatedText(null);
   }, [currentQuestionId]);
 
-  if (isLoading || !questions || !scheduler || !sessionState || currentQuestionId === null) {
+  const handleBlockSelect = (blockIndex: number) => {
+    setSelectedBlockIndex(blockIndex);
+    setBlockSelectionComplete(true);
+  };
+
+  // Block selection screen
+  if (!blockSelectionComplete) {
+    if (availableBlocks.length === 0) {
+      return (
+        <div className="max-w-2xl mx-auto">
+          <Button variant="ghost" onClick={onBack} className="mb-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Editor
+          </Button>
+          <Card>
+            <CardHeader>
+              <CardTitle>No Questions Available</CardTitle>
+              <CardDescription>
+                This quiz doesn't have any questions yet. Please add questions in the editor first.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={onBack} className="w-full">
+                Go to Editor
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return (
+      <div className="max-w-2xl mx-auto">
+        <Button variant="ghost" onClick={onBack} className="mb-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Editor
+        </Button>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Select Question Block</CardTitle>
+            <CardDescription>
+              Choose which 100-question block you want to practice. Each block contains up to 100 questions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {availableBlocks.map((blockIdx) => {
+              const blockLabel = getCombinedBlockLabel(blockIdx, blockNamesMap?.get(blockIdx));
+              return (
+                <Button
+                  key={blockIdx}
+                  variant="outline"
+                  className="w-full justify-start text-left h-auto py-4"
+                  onClick={() => handleBlockSelect(blockIdx)}
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-semibold">{blockLabel}</span>
+                    <span className="text-sm text-muted-foreground">
+                      Practice questions in this block
+                    </span>
+                  </div>
+                </Button>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (questionsLoading || !questions || !scheduler || !sessionState || currentQuestionId === null) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
@@ -174,6 +259,10 @@ export default function QuizGameplay({ quizId, onComplete, onBack }: QuizGamepla
   };
 
   const displayedQuestionText = showTranslation && translatedText ? translatedText : currentQuestion.text;
+  const currentBlockLabel = getCombinedBlockLabel(
+    selectedBlockIndex ?? 0,
+    blockNamesMap?.get(selectedBlockIndex ?? 0)
+  );
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -185,6 +274,9 @@ export default function QuizGameplay({ quizId, onComplete, onBack }: QuizGamepla
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Block: {currentBlockLabel}
+            </span>
             <span className="text-muted-foreground">
               Progress: {uniqueQuestionsAttempted} of {questions.length} questions attempted
             </span>

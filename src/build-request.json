@@ -1,70 +1,124 @@
 {
   "kind": "build_request",
-  "title": "Replace translation help/flag button with funny bold “Plan‑B” sign",
+  "title": "Add named 100-question blocks (patterns) in editor and selectable blocks in gameplay",
   "priority": "normal",
   "requirements": [
     {
-      "id": "REQ-1",
-      "text": "Update the translation press-and-hold control in `frontend/src/quiz/QuizGameplay.tsx` (currently the English-flag icon with the small \"hilfe\" label) to display a funny-looking, bold \"Plan-B\" sign-style text instead of the flag image and \"hilfe\".",
-      "target": "frontend",
+      "id": "REQ-11",
+      "text": "Add backend support for storing and retrieving per-user, per-quiz names for 100-question blocks (\"question patterns\"). Implement APIs to (1) fetch all saved block names for a quiz and (2) set/update a specific block name by its 0-based block index (blockIndex = 0 for questions 1–100, 1 for 101–200, etc.).",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-9"
         ],
         "quotes": [
-          "modify hilfe/flag button so that it is instead funny looking \"Plan-B\" text, funny sign with bold letters"
+          "Can you add option in Edit question page to organize question patterns in 100 question blocks when adding new questions? Also I want give individual name for the question patterns and those should be selectable in Quiz game by user."
         ]
       },
       "acceptanceCriteria": [
-        "The translation control no longer renders `/assets/generated/english-flag-icon-v2.dim_24x24.png` nor the \"hilfe\" label.",
-        "The control renders the text \"Plan-B\" with a visually distinct, sign-like styling (e.g., bold, bordered/badge-like treatment) that reads as intentionally funny.",
-        "The control remains located in the same place (right side of the question header area) and remains clickable/touchable."
+        "Backend exposes a query method to return saved pattern/block names for the authenticated caller and given quizId.",
+        "Backend exposes an update method to set a pattern/block name for the authenticated caller and given quizId + blockIndex.",
+        "Block naming is scoped to the authenticated user (Principal) and quizId (no cross-user leakage)."
       ]
     },
     {
-      "id": "REQ-2",
-      "text": "Preserve existing translation behavior for the control (press/hold shows translation; release hides it), including disabled/loading behavior while translating, after swapping the UI to \"Plan-B\".",
+      "id": "REQ-12",
+      "text": "Update the Edit Questions (QuizEditor) UI to support organizing questions into 100-question blocks. Add a block selector that lets the user choose which 100-question block they are viewing/editing (e.g., \"1–100\", \"101–200\", ...), and display only questions within the selected block range in the editor list.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-9"
         ],
         "quotes": [
-          "modify hilfe/flag button so that it is instead funny looking \"Plan-B\" text, funny sign with bold letters"
+          "add option in Edit question page to organize question patterns in 100 question blocks"
         ]
       },
       "acceptanceCriteria": [
-        "Pointer/mouse/touch press-and-hold events continue to trigger translation exactly as before.",
-        "When `isTranslating` is true, the loading indicator still appears and the control is disabled (no translation toggling while disabled)."
+        "QuizEditor shows a control to select a block and clearly indicates the selected block range (English UI text).",
+        "When a block is selected, only the questions in that 100-question range are shown in the questions accordion list.",
+        "Searching (if enabled) operates within the currently selected block (or clearly indicates otherwise)."
       ]
     },
     {
-      "id": "REQ-3",
-      "text": "Ensure user-facing text associated with the control is in English (e.g., tooltip/title/aria-label) and reflects the new \"Plan-B\" presentation while still communicating the action (press and hold to translate to English).",
-      "target": "frontend",
+      "id": "REQ-13",
+      "text": "In the Edit Questions (QuizEditor) UI, add the ability to assign an individual name to each 100-question block (pattern). The user must be able to edit/save the name for the currently selected block, persisted via the backend, and the name should be shown in the block selector (falling back to the numeric range if unnamed).",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-9"
         ],
         "quotes": [
-          "Use English for any user-facing text in the build request."
+          "Also I want give individual name for the question patterns"
         ]
       },
       "acceptanceCriteria": [
-        "No German label (e.g., \"hilfe\") is shown for this control.",
-        "The control has an English tooltip/title and/or aria-label that communicates the press-and-hold translation action."
+        "User can set/update a block name for the selected block from the editor UI and it persists after refresh/reload.",
+        "Block selector displays saved names (e.g., \"Cardiology (1–100)\") and uses a sensible default label when no name exists.",
+        "All user-facing text is in English."
+      ]
+    },
+    {
+      "id": "REQ-14",
+      "text": "Update the Edit Questions (QuizEditor) \"Add Question\" behavior so that when a block is selected, new questions are added into that block context (i.e., appended within the selected block’s range rather than always appended to the very end of the full quiz). If inserting would split later blocks, reindexing should be handled consistently by using the underlying question array order as the source of truth.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-9"
+        ],
+        "quotes": [
+          "organize question patterns in 100 question blocks when adding new questions"
+        ]
+      },
+      "acceptanceCriteria": [
+        "When the user is viewing a specific block and clicks \"Add Question\", the newly created question appears within the currently selected block view.",
+        "Saving the quiz persists the updated question order/contents correctly using the existing save mechanism."
+      ]
+    },
+    {
+      "id": "REQ-15",
+      "text": "Update quiz gameplay to allow the user to select which named 100-question block (pattern) to play before starting the quiz session. Gameplay must load and run the quiz only on the questions in the selected block, and the selection UI must display block names (with numeric range fallback).",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-9"
+        ],
+        "quotes": [
+          "those should be selectable in Quiz game by user."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Before the first question is shown, the user can choose a block/pattern to practice for the current quizId.",
+        "Gameplay only schedules/questions within the selected 100-question block range (not the entire quiz).",
+        "Block list uses saved names from the backend when available and otherwise shows the range label.",
+        "All user-facing text is in English."
+      ]
+    },
+    {
+      "id": "REQ-16",
+      "text": "Add/extend React Query hooks to support: (1) fetching a specific 100-question chunk using the existing backend chunk API, and (2) fetching/updating block (pattern) names for a quiz. Use these hooks in QuizEditor and QuizGameplay.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-9"
+        ],
+        "quotes": [
+          "those should be selectable in Quiz game by user."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Frontend has reusable hooks for chunked question fetch (chunkSize=100, chunkIndex=N).",
+        "Frontend has hooks for get/set block names that correctly invalidate and refresh cached data after updates."
       ]
     }
   ],
   "constraints": [
-    "Do not edit files under `frontend/src/components/ui` (compose existing components instead).",
-    "Keep backend unchanged; this is a frontend-only UI change.",
-    "Maintain the existing translation interaction model (press-and-hold to show, release to hide)."
+    "Respect the single-actor backend architecture: all Motoko logic must remain in backend/main.mo.",
+    "Do not edit files under frontend/src/components/ui or any frontend immutablePaths listed in SYSTEM_CONTEXT; only compose/reuse them."
   ],
   "nonGoals": [
-    "Do not change translation logic, caching behavior, or translation API configuration.",
-    "Do not add new authentication or routing changes.",
-    "Do not redesign unrelated parts of the quiz gameplay UI."
+    "Do not implement the earlier \"remember wrong answers and start with weak questions\" feature as part of this request.",
+    "Do not add third-party authentication providers; keep Internet Identity as-is.",
+    "Do not introduce external databases or additional backend services."
   ],
   "imageRequirements": {
     "required": [],

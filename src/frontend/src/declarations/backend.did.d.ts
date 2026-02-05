@@ -25,7 +25,9 @@ export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'appendQuestions' : ActorMethod<[QuizId, Array<Question>], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'getAllBlockNames' : ActorMethod<[QuizId], Array<[bigint, string]>>,
   'getAllQuestions' : ActorMethod<[QuizId], Array<Question>>,
+  'getBlockName' : ActorMethod<[QuizId, bigint], [] | [string]>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getQuestion' : ActorMethod<[QuizId, bigint], [] | [Question]>,
@@ -37,6 +39,7 @@ export interface _SERVICE {
   'renameQuiz' : ActorMethod<[QuizId, QuizId], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'saveQuestions' : ActorMethod<[QuizId, Array<Question>], undefined>,
+  'setBlockName' : ActorMethod<[QuizId, bigint, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

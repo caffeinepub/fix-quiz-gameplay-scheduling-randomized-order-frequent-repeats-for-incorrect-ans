@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useGetAllQuestions, useSaveQuestions, useListAllQuizzes, useGetAllQuizCounts, useGetFirst20Questions } from '../hooks/useQueries';
+import { useGetAllQuestions, useSaveQuestions, useListAllQuizzes, useGetAllQuizCounts, useGetFirst20Questions, useGetQuestionCount, useGetAllBlockNames, useSetBlockName } from '../hooks/useQueries';
 import { useQuizRecovery } from '../hooks/useQuizRecovery';
 import { validateQuestions } from './validation';
 import type { Question, QuizId } from './types';
@@ -8,14 +8,16 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
-import { Plus, Trash2, Save, Play, AlertCircle, Search, RefreshCw, Eye } from 'lucide-react';
+import { Plus, Trash2, Save, Play, AlertCircle, Search, RefreshCw, Eye, Edit2, Check, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { Badge } from '../components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import TroubleshootingPanel from './TroubleshootingPanel';
+import { getAvailableBlockIndices, getCombinedBlockLabel, getBlockRange } from './blockUtils';
 
 interface QuizEditorProps {
   quizId: QuizId;
@@ -128,6 +130,9 @@ function QuizRecoveryPrompt({
 
 export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
   const { data: savedQuestions, isLoading } = useGetAllQuestions(quizId);
+  const { data: questionCountBigInt } = useGetQuestionCount(quizId);
+  const { data: blockNamesMap } = useGetAllBlockNames(quizId);
+  const setBlockNameMutation = useSetBlockName(quizId);
   const saveQuestions = useSaveQuestions(quizId);
 
   const [questions, setQuestions] = useState<Question[]>([
@@ -144,9 +149,15 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
   const [showRestorePrompt, setShowRestorePrompt] = useState(false);
   const [showFirst20Dialog, setShowFirst20Dialog] = useState(false);
   const [enableFirst20Fetch, setEnableFirst20Fetch] = useState(false);
+  const [selectedBlockIndex, setSelectedBlockIndex] = useState(0);
+  const [isEditingBlockName, setIsEditingBlockName] = useState(false);
+  const [editBlockName, setEditBlockName] = useState('');
   const pageSize = 10;
 
   const { data: first20Questions, isLoading: first20Loading, error: first20Error } = useGetFirst20Questions(quizId, enableFirst20Fetch);
+
+  const totalQuestions = questionCountBigInt ? Number(questionCountBigInt) : questions.length;
+  const availableBlocks = getAvailableBlockIndices(totalQuestions);
 
   useEffect(() => {
     if (savedQuestions && savedQuestions.length > 0) {
@@ -170,7 +181,11 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
     }
   }, [first20Error, enableFirst20Fetch]);
 
-  const filteredQuestions = questions.filter(q =>
+  // Filter questions by selected block
+  const blockRange = getBlockRange(selectedBlockIndex);
+  const questionsInBlock = questions.slice(blockRange.start, blockRange.end);
+
+  const filteredQuestions = questionsInBlock.filter(q =>
     q.text.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -233,14 +248,21 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
   };
 
   const addQuestion = () => {
-    setQuestions([
-      ...questions,
-      {
-        text: '',
-        answers: ['', ''],
-        correctAnswer: BigInt(0),
-      },
-    ]);
+    const newQuestion = {
+      text: '',
+      answers: ['', ''],
+      correctAnswer: BigInt(0),
+    };
+    
+    // Insert at the end of the current block
+    const insertIndex = Math.min(blockRange.end, questions.length);
+    const newQuestions = [
+      ...questions.slice(0, insertIndex),
+      newQuestion,
+      ...questions.slice(insertIndex),
+    ];
+    
+    setQuestions(newQuestions);
   };
 
   const removeQuestion = (globalIndex: number) => {
@@ -293,6 +315,41 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
     setShowFirst20Dialog(false);
     setEnableFirst20Fetch(false);
   };
+
+  const handleBlockChange = (value: string) => {
+    setSelectedBlockIndex(parseInt(value));
+    setCurrentPage(0);
+    setSearchTerm('');
+  };
+
+  const handleEditBlockName = () => {
+    const currentName = blockNamesMap?.get(selectedBlockIndex) || '';
+    setEditBlockName(currentName);
+    setIsEditingBlockName(true);
+  };
+
+  const handleSaveBlockName = async () => {
+    try {
+      await setBlockNameMutation.mutateAsync({
+        blockIndex: selectedBlockIndex,
+        blockName: editBlockName.trim(),
+      });
+      toast.success('Block name saved!');
+      setIsEditingBlockName(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save block name');
+    }
+  };
+
+  const handleCancelEditBlockName = () => {
+    setIsEditingBlockName(false);
+    setEditBlockName('');
+  };
+
+  const currentBlockLabel = getCombinedBlockLabel(
+    selectedBlockIndex,
+    blockNamesMap?.get(selectedBlockIndex)
+  );
 
   if (isLoading) {
     return (
@@ -353,12 +410,84 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
         </Alert>
       )}
 
+      {/* Block Selector */}
+      {availableBlocks.length > 1 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Question Block</CardTitle>
+            <CardDescription>
+              Select a 100-question block to view and edit. Questions are organized in blocks of 100.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Label htmlFor="block-select">Select Block</Label>
+                <Select value={String(selectedBlockIndex)} onValueChange={handleBlockChange}>
+                  <SelectTrigger id="block-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableBlocks.map((blockIdx) => (
+                      <SelectItem key={blockIdx} value={String(blockIdx)}>
+                        {getCombinedBlockLabel(blockIdx, blockNamesMap?.get(blockIdx))}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {!isEditingBlockName && (
+                <Button variant="outline" size="icon" onClick={handleEditBlockName}>
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            {isEditingBlockName && (
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Label htmlFor="block-name-input">Block Name</Label>
+                  <Input
+                    id="block-name-input"
+                    value={editBlockName}
+                    onChange={(e) => setEditBlockName(e.target.value)}
+                    placeholder="Enter a name for this block (e.g., Cardiology)"
+                  />
+                </div>
+                <Button
+                  variant="default"
+                  size="icon"
+                  onClick={handleSaveBlockName}
+                  disabled={setBlockNameMutation.isPending}
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleCancelEditBlockName}
+                  disabled={setBlockNameMutation.isPending}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            <div className="text-sm text-muted-foreground">
+              Currently viewing: <span className="font-medium">{currentBlockLabel}</span>
+              {' • '}
+              {questionsInBlock.length} question{questionsInBlock.length !== 1 ? 's' : ''} in this block
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Search and Add Question */}
       <div className="mb-4 flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search questions..."
+            placeholder="Search questions in current block..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -467,7 +596,7 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
         <div className="mt-6 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             Showing {startIndex + 1}-{endIndex} of {filteredQuestions.length}
-            {searchTerm && ` (filtered from ${questions.length} total)`}
+            {searchTerm && ` (filtered from ${questionsInBlock.length} in block)`}
           </p>
           <div className="flex gap-2">
             <Button

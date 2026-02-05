@@ -94,6 +94,19 @@ export function useGetAllQuestions(quizId: QuizId) {
   });
 }
 
+export function useGetQuestionChunk(quizId: QuizId, blockIndex: number, enabled: boolean = true) {
+  const { actor, isFetching: actorFetching } = useActor();
+
+  return useQuery<Question[]>({
+    queryKey: ['questionChunk', quizId, blockIndex],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.getQuestions(quizId, BigInt(100), BigInt(blockIndex));
+    },
+    enabled: !!actor && !actorFetching && !!quizId && enabled,
+  });
+}
+
 export function useGetFirst20Questions(quizId: QuizId, enabled: boolean = false) {
   const { actor, isFetching: actorFetching } = useActor();
 
@@ -104,6 +117,39 @@ export function useGetFirst20Questions(quizId: QuizId, enabled: boolean = false)
       return actor.getQuestions(quizId, BigInt(20), BigInt(0));
     },
     enabled: !!actor && !actorFetching && !!quizId && enabled,
+  });
+}
+
+export function useGetAllBlockNames(quizId: QuizId) {
+  const { actor, isFetching: actorFetching } = useActor();
+
+  return useQuery<Map<number, string>>({
+    queryKey: ['blockNames', quizId],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      const pairs = await actor.getAllBlockNames(quizId);
+      const map = new Map<number, string>();
+      pairs.forEach(([blockIndex, name]) => {
+        map.set(Number(blockIndex), name);
+      });
+      return map;
+    },
+    enabled: !!actor && !actorFetching && !!quizId,
+  });
+}
+
+export function useSetBlockName(quizId: QuizId) {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ blockIndex, blockName }: { blockIndex: number; blockName: string }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.setBlockName(quizId, BigInt(blockIndex), blockName);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blockNames', quizId] });
+    },
   });
 }
 
@@ -122,6 +168,7 @@ export function useSaveQuestions(quizId: QuizId) {
       queryClient.invalidateQueries({ queryKey: ['allQuizzes'] });
       queryClient.invalidateQueries({ queryKey: ['allQuizCounts'] });
       queryClient.invalidateQueries({ queryKey: ['first20Questions', quizId] });
+      queryClient.invalidateQueries({ queryKey: ['questionChunk', quizId] });
     },
   });
 }

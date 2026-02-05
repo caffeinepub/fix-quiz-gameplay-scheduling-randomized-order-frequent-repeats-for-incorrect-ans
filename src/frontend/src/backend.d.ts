@@ -25,7 +25,9 @@ export enum UserRole {
 export interface backendInterface {
     appendQuestions(quizId: QuizId, newQuestions: Array<Question>): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    getAllBlockNames(quizId: QuizId): Promise<Array<[bigint, string]>>;
     getAllQuestions(quizId: QuizId): Promise<Array<Question>>;
+    getBlockName(quizId: QuizId, blockIndex: bigint): Promise<string | null>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getQuestion(quizId: QuizId, questionId: bigint): Promise<Question | null>;
@@ -37,4 +39,5 @@ export interface backendInterface {
     renameQuiz(oldQuizId: QuizId, newQuizId: QuizId): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     saveQuestions(quizId: QuizId, questionsInput: Array<Question>): Promise<void>;
+    setBlockName(quizId: QuizId, blockIndex: bigint, blockName: string): Promise<void>;
 }

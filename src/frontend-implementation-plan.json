@@ -1,51 +1,114 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Swap quiz translation control UI to a bold “Plan-B” sign while preserving press-and-hold behavior",
+  "title": "Named 100-question blocks in editor and selectable blocks in gameplay",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Replace the flag + “hilfe” translation control UI with a funny, bold, sign-like “Plan-B” text treatment in QuizGameplay.",
+      "id": "REQ-12",
+      "summary": "Add a 100-question block selector in QuizEditor and display only questions from the selected block range.",
       "acceptanceCriteria": [
-        "The translation control no longer renders `/assets/generated/english-flag-icon-v2.dim_24x24.png` nor the \"hilfe\" label.",
-        "The control renders the text \"Plan-B\" with a visually distinct, sign-like styling (e.g., bold, bordered/badge-like treatment) that reads as intentionally funny.",
-        "The control remains located in the same place (right side of the question header area) and remains clickable/touchable."
+        "QuizEditor shows a control to select a block and clearly indicates the selected block range (English UI text).",
+        "When a block is selected, only the questions in that 100-question range are shown in the questions accordion list.",
+        "Searching (if enabled) operates within the currently selected block (or clearly indicates otherwise)."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "path": "frontend/src/quiz/blockUtils.ts",
+          "operation": "create",
+          "description": "Add utilities for 100-question block math (blockIndex ↔ range start/end), default labels (e.g., \"1–100\"), and helpers to determine available block indices from a total question count."
+        },
+        {
+          "path": "frontend/src/quiz/QuizEditor.tsx",
           "operation": "modify",
-          "description": "In the question header translation control, remove the flag <img> and the \"hilfe\" label. Replace them with a single \"Plan-B\" text element styled to read like a bold, funny sign (e.g., badge-like border, strong font weight, slightly playful/handmade feel via subtle rotation/uppercase/letterspacing using existing Tailwind utility classes). Keep the control in the same header location and preserve its button hit-area."
+          "description": "Add block selection state (0-based blockIndex) and UI controls to select a block and display the selected range in English. Update the editor list to show only questions in the selected 100-question range and ensure search filtering applies within that selected block context."
         }
       ]
     },
     {
-      "id": "REQ-2",
-      "summary": "Keep the existing press/hold translation interaction and disabled/loading behavior while changing only the control’s visual presentation.",
+      "id": "REQ-13",
+      "summary": "Enable naming of each 100-question block in QuizEditor and show saved names in the block selector with range fallback.",
       "acceptanceCriteria": [
-        "Pointer/mouse/touch press-and-hold events continue to trigger translation exactly as before.",
-        "When `isTranslating` is true, the loading indicator still appears and the control is disabled (no translation toggling while disabled)."
+        "User can set/update a block name for the selected block from the editor UI and it persists after refresh/reload.",
+        "Block selector displays saved names (e.g., \"Cardiology (1–100)\") and uses a sensible default label when no name exists.",
+        "All user-facing text is in English."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Ensure the translation control continues to use the existing press-and-hold event handlers (pointer/mouse/touch) and release/cancel handlers unchanged. Preserve the current disabled={isTranslating} behavior and keep showing the Loader2 spinner while translating; only swap the non-loading UI to the \"Plan-B\" sign text."
+          "description": "Add React Query hooks for block name retrieval and updates for a quiz: a query hook to fetch all block names and a mutation hook to set/update the name for a given block index. Ensure the mutation invalidates and refreshes the cached block-name query data after updates."
+        },
+        {
+          "path": "frontend/src/quiz/QuizEditor.tsx",
+          "operation": "modify",
+          "description": "Integrate block name hooks into QuizEditor: fetch existing names for the quiz, display names within the block selector (with numeric range fallback), and add an English-labeled input + save action to edit and persist the name for the currently selected block."
         }
       ]
     },
     {
-      "id": "REQ-3",
-      "summary": "Make all user-facing text for the control English and aligned with the new “Plan-B” presentation while still communicating press-and-hold translation behavior.",
+      "id": "REQ-14",
+      "summary": "Update QuizEditor “Add Question” so new questions are added into the currently selected 100-question block context.",
       "acceptanceCriteria": [
-        "No German label (e.g., \"hilfe\") is shown for this control.",
-        "The control has an English tooltip/title and/or aria-label that communicates the press-and-hold translation action."
+        "When the user is viewing a specific block and clicks \"Add Question\", the newly created question appears within the currently selected block view.",
+        "Saving the quiz persists the updated question order/contents correctly using the existing save mechanism."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/quiz/QuizEditor.tsx",
+          "operation": "modify",
+          "description": "Change Add Question behavior to insert/append within the selected block range (based on the underlying question array order as source of truth). Ensure the newly created question appears in the current block view immediately and that existing save behavior persists the resulting full question order consistently."
+        }
+      ]
+    },
+    {
+      "id": "REQ-15",
+      "summary": "Add a pre-start block/pattern selection UI in gameplay and run the session only on the selected 100-question block.",
+      "acceptanceCriteria": [
+        "Before the first question is shown, the user can choose a block/pattern to practice for the current quizId.",
+        "Gameplay only schedules/questions within the selected 100-question block range (not the entire quiz).",
+        "Block list uses saved names from the backend when available and otherwise shows the range label.",
+        "All user-facing text is in English."
       ],
       "file_operations": [
         {
           "path": "frontend/src/quiz/QuizGameplay.tsx",
           "operation": "modify",
-          "description": "Update the translation control’s accessible/user-facing strings to English and consistent with the new \"Plan-B\" UI (e.g., keep/update title and add/adjust aria-label to communicate \"Press and hold to translate to English\"). Remove any remaining German text related to the control."
+          "description": "Add a pre-start UI step to select a 100-question block for the current quizId (English UI text), showing saved block names with numeric range fallback. After selection, load only the selected block’s questions and initialize the adaptive scheduler/session using that block question set (not the full quiz)."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Ensure gameplay can access reusable hooks for fetching block names and the selected 100-question chunk so QuizGameplay can render the selection list and then load the chosen block."
+        },
+        {
+          "path": "frontend/src/quiz/blockUtils.ts",
+          "operation": "modify",
+          "description": "Extend block utility helpers (if needed) to produce combined labels for gameplay selection (e.g., \"Saved Name (1–100)\") with a consistent English fallback when no saved name exists."
+        }
+      ]
+    },
+    {
+      "id": "REQ-16",
+      "summary": "Add/extend React Query hooks for fetching 100-question chunks and for fetching/updating block names, and use them in QuizEditor and QuizGameplay.",
+      "acceptanceCriteria": [
+        "Frontend has reusable hooks for chunked question fetch (chunkSize=100, chunkIndex=N).",
+        "Frontend has hooks for get/set block names that correctly invalidate and refresh cached data after updates."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add a reusable React Query hook for chunked question fetch using the backend chunk API with chunkSize=100 and chunkIndex=N, with stable query keys for caching. Also add/confirm hooks for getAllBlockNames and setBlockName with correct cache invalidation so consumers refresh after updates."
+        },
+        {
+          "path": "frontend/src/quiz/QuizEditor.tsx",
+          "operation": "modify",
+          "description": "Update QuizEditor to use the new 100-question chunk hook to load/display the currently selected block’s questions (in combination with the editor’s existing save mechanism). Ensure block switching triggers the correct chunk fetch and the editor list reflects only that chunk."
+        },
+        {
+          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "operation": "modify",
+          "description": "Update QuizGameplay to use the chunk hook (chunkSize=100) for the selected block and to use the block-name query hook for rendering selection labels. Ensure the scheduler/session state is built only from the chunked question list."
         }
       ]
     }

@@ -5,11 +5,12 @@ import Array "mo:core/Array";
 import Iter "mo:core/Iter";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
-
+import Migration "migration";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 
-// No migration needed unless state variables are changed or deleted in the future.
+// Backward migration (with full path due to code generation) and forward migration (empty) are required to prevent loss of persistent state during upgrades. Do not remove.
+(with migration = Migration.run)
 actor {
   // Initialize the user system state
   let accessControlState = AccessControl.initState();
@@ -54,6 +55,9 @@ actor {
   public type ListAllQuizzesInput = Principal;
 
   let quizSets = Map.empty<Principal, Map.Map<Text, [Question]>>();
+
+  // New block names state variable; Mapping: Principal (User) -> QuizId -> BlockIndex -> BlockName (Text)
+  let blockNames = Map.empty<Principal, Map.Map<Text, Map.Map<Nat, Text>>>();
 
   public query ({ caller }) func listAllQuizzes() : async ListAllQuizzesResult {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
@@ -186,6 +190,66 @@ actor {
         preparedQuestionsMap.add(newQuizId, questions);
         preparedQuestionsMap.remove(oldQuizId);
         quizSets.add(caller, preparedQuestionsMap);
+      };
+    };
+  };
+
+  // Save or update a block name for a specific quiz and block index
+  public shared ({ caller }) func setBlockName(quizId : QuizId, blockIndex : Nat, blockName : Text) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can save block names");
+    };
+
+    let userBlockNames = switch (blockNames.get(caller)) {
+      case (null) { Map.empty<QuizId, Map.Map<Nat, Text>>() };
+      case (?existing) { existing };
+    };
+
+    let quizBlockNames = switch (userBlockNames.get(quizId)) {
+      case (null) { Map.empty<Nat, Text>() };
+      case (?existing) { existing };
+    };
+
+    quizBlockNames.add(blockIndex, blockName);
+    userBlockNames.add(quizId, quizBlockNames);
+    blockNames.add(caller, userBlockNames);
+  };
+
+  // Retrieve all block names for a specific quiz
+  public query ({ caller }) func getAllBlockNames(quizId : QuizId) : async [(Nat, Text)] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can access block names");
+    };
+
+    let userBlockNames = switch (blockNames.get(caller)) {
+      case (null) { Map.empty<QuizId, Map.Map<Nat, Text>>() };
+      case (?existing) { existing };
+    };
+
+    switch (userBlockNames.get(quizId)) {
+      case (null) { [] };
+      case (?quizBlockNames) {
+        let pairs = quizBlockNames.toArray();
+        pairs;
+      };
+    };
+  };
+
+  // Get a specific block name for a quiz and block index
+  public query ({ caller }) func getBlockName(quizId : QuizId, blockIndex : Nat) : async ?Text {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can access block names");
+    };
+
+    let userBlockNames = switch (blockNames.get(caller)) {
+      case (null) { Map.empty<QuizId, Map.Map<Nat, Text>>() };
+      case (?existing) { existing };
+    };
+
+    switch (userBlockNames.get(quizId)) {
+      case (null) { null };
+      case (?quizBlockNames) {
+        quizBlockNames.get(blockIndex);
       };
     };
   };

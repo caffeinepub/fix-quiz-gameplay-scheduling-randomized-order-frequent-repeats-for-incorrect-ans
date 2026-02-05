@@ -1,11 +1,14 @@
 # Specification
 
 ## Summary
-**Goal:** Replace the quiz translation help/flag control with a funny, bold “Plan-B” sign-style text while keeping the existing press-and-hold translation behavior.
+**Goal:** Let users organize quiz questions into named 100-question blocks (“patterns”) in the editor and select a block to practice in gameplay.
 
 **Planned changes:**
-- Update the translation press-and-hold control UI in `frontend/src/quiz/QuizGameplay.tsx` to render a visually distinct, sign-like “Plan-B” text instead of the English flag icon and the “hilfe” label.
-- Preserve all existing interaction and state behavior for translation (press/hold shows translation, release hides; loading/disabled behavior and indicator remain unchanged).
-- Ensure any user-facing text for the control (e.g., tooltip/title/aria-label) is in English and communicates “press and hold to translate to English,” reflecting the new “Plan-B” presentation.
+- Add backend storage and APIs to fetch and set per-user, per-quiz block (100-question chunk) names by 0-based blockIndex.
+- Update the Edit Questions (QuizEditor) UI with a 100-question block selector that filters the question list to the selected block range.
+- Add UI to view/edit/save the name for the currently selected block, and show saved names in the block selector (range fallback when unnamed).
+- Adjust “Add Question” in the editor so new questions are added within the currently selected 100-question block context.
+- Update gameplay to prompt for a block selection before starting and run the quiz session only on questions in the selected block.
+- Add/extend React Query hooks to (1) fetch question chunks (chunkSize=100, chunkIndex=N) and (2) fetch/update block names, with proper cache invalidation.
 
-**User-visible outcome:** The translation control appears as a funny, bold “Plan-B” sign on the right side of the question header, remains press-and-hold usable to show/hide English translation, and no longer shows the flag icon or German “hilfe” text.
+**User-visible outcome:** In the question editor, users can switch between 100-question blocks, name each block, and add questions within a chosen block. In gameplay, users can choose a named block to practice and only questions from that block are used.
