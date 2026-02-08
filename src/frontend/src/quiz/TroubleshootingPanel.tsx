@@ -10,10 +10,16 @@ import type { QuizId } from './types';
 
 interface TroubleshootingPanelProps {
   currentQuizId: QuizId;
+  initialOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export default function TroubleshootingPanel({ currentQuizId }: TroubleshootingPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function TroubleshootingPanel({ 
+  currentQuizId, 
+  initialOpen = false,
+  onOpenChange 
+}: TroubleshootingPanelProps) {
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const { data: quizzesData, isLoading: quizzesLoading } = useListAllQuizzes();
   const availableQuizzes = quizzesData?.[1] || [];
   const { data: quizCounts, isLoading: countsLoading } = useGetAllQuizCounts(availableQuizzes);
@@ -27,8 +33,13 @@ export default function TroubleshootingPanel({ currentQuizId }: TroubleshootingP
 
   const hasOtherQuizzesWithQuestions = otherQuizzesWithQuestions.length > 0;
 
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    onOpenChange?.(open);
+  };
+
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mb-6">
+    <Collapsible open={isOpen} onOpenChange={handleOpenChange} className="mb-6">
       <Card>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">

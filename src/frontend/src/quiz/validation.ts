@@ -17,10 +17,14 @@ export function validateQuestions(questions: Question[]): ValidationError[] {
   }
 
   questions.forEach((question, index) => {
-    if (!question.text.trim()) {
+    // Question must have either text or an image (or both)
+    const hasText = question.text.trim().length > 0;
+    const hasImage = !!question.imageUrl;
+
+    if (!hasText && !hasImage) {
       errors.push({
-        field: `question-${index}-text`,
-        message: `Question ${index + 1}: Text is required`,
+        field: `question-${index}-content`,
+        message: `Question ${index + 1}: Must have either question text or an image`,
       });
     }
 

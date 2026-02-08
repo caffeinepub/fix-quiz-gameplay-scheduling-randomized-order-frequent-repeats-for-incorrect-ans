@@ -1,44 +1,43 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-05T06:00:33.131Z",
-  "summary": "Diff adds frontend utilities and UI wiring for 100-question blocks (blockUtils, chunk hook, editor/gameplay integration) and introduces backend state for block names, but the backend API surface for get/set block names is not visible in the provided backend diff snippet. Diff also includes unrelated adaptive scheduler changes and a new migration module not requested in the BuildRequest.",
+  "generatedAt": "2026-02-08T10:09:10.282Z",
+  "summary": "Diff adds localStorage-based draft helpers and disables React Query refetch-on-window-focus for the questions query. However, key REQ-5/REQ-6 behaviors (guarded local state sync, explicit reload confirmation when unsaved changes exist, and draft restore/resume/discard UI flows) are not clearly evidenced in the provided truncated diffs.",
   "missing_requirements": [
     {
-      "id": "REQ-11",
-      "requirement": "Backend exposes (1) a query method to return saved per-user block/pattern names for a given quizId, and (2) an update method to set a block name for quizId + 0-based blockIndex, scoped to authenticated caller.",
-      "reason": "backend/main.mo shows a new `blockNames` state variable, but the diff excerpt does not show any new public query/update methods implementing the required APIs; content is truncated before any such methods appear.",
+      "id": "REQ-5",
+      "requirement": "Guard the \"sync localQuestions from questions\" effect so it does not run when there are unsaved changes; after successful save it can sync again; explicit reload/refetch must require confirmation before discarding local edits.",
+      "reason": "The diff shows REQ-4 implemented via `refetchOnWindowFocus: false`, but the provided QuizEditor diff snippet is truncated before any localQuestions syncing effect, hasUnsavedChanges logic, or reload/refetch confirmation UI can be verified.",
       "evidence": [
-        "backend/main.mo (truncated: shows `let blockNames = ...` but no visible get/set methods)"
+        "frontend/src/quiz/QuizEditor.tsx (truncated; no visible effect/confirmation logic)"
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "requirement": "Persist in-progress edits to browser storage keyed by quizId; restore on reload/navigation; show clear English UI text to resume/discard draft if server version differs; clear stored draft after successful Save; include image ExternalBlob data or clearly indicate reattach if not restorable.",
+      "reason": "A draft storage module is added, but the diff snippet for QuizEditor does not show the required restore-on-load behavior, any resume/discard prompt UI, server-vs-draft comparison, clearing draft on successful save, or UI messaging for non-restorable images.",
+      "evidence": [
+        "frontend/src/quiz/draftStorage.ts (storage helpers only; no UI)",
+        "frontend/src/quiz/QuizEditor.tsx (truncated; only shows imports of draftStorage helpers, not their usage)"
       ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "Adaptive scheduler behavior change (interleaving repeats during first pass, added/used fields like `everMissed`, spacing rules changes).",
-      "reason": "Not requested; also overlaps with the explicitly stated non-goal of implementing a “weak questions / wrong answers” related feature as part of this request.",
+      "description": "Added/expanded image upload UX (upload progress state/percent display, 5MB size limit validation, and related toasts) in QuestionImagePicker.",
+      "reason": "BuildRequest focuses on preventing loss of unsaved edits, refetch behavior, and draft persistence; it does not request new upload progress UI or file size limits.",
       "evidence": [
-        "frontend-file-summaries.txt (mentions changes in `frontend/src/quiz/adaptiveScheduler.ts`)"
-      ]
-    },
-    {
-      "description": "Added backend upgrade migration module (`backend/migration.mo`) and wired upgrade migration hook in backend.",
-      "reason": "Not requested by any requirement in the BuildRequest; introduces new backend module/code beyond specified features.",
-      "evidence": [
-        "backend/migration.mo",
-        "backend/main.mo (imports `Migration \"migration\"` and `(with migration = Migration.run)`)"
+        "frontend/src/quiz/QuestionImagePicker.tsx (adds uploadProgress/isUploading, progress text, 5MB check)"
       ]
     }
   ],
-  "confidence": 0.6,
+  "confidence": 0.62,
   "changed_files": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "frontend-file-summaries.txt",
     "frontend/src/hooks/useQueries.ts",
+    "frontend/src/quiz/QuestionImagePicker.tsx",
     "frontend/src/quiz/QuizEditor.tsx",
-    "frontend/src/quiz/QuizGameplay.tsx",
-    "frontend/src/quiz/blockUtils.ts",
+    "frontend/src/quiz/draftStorage.ts",
     "project_state.json"
   ]
 }

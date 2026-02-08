@@ -1,124 +1,73 @@
 {
   "kind": "build_request",
-  "title": "Add named 100-question blocks (patterns) in editor and selectable blocks in gameplay",
-  "priority": "normal",
+  "title": "Prevent Quiz Editor from losing unsaved question edits when switching tabs (regression after adding JPG)",
+  "priority": "high",
   "requirements": [
     {
-      "id": "REQ-11",
-      "text": "Add backend support for storing and retrieving per-user, per-quiz names for 100-question blocks (\"question patterns\"). Implement APIs to (1) fetch all saved block names for a quiz and (2) set/update a specific block name by its 0-based block index (blockIndex = 0 for questions 1–100, 1 for 101–200, etc.).",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-9"
-        ],
-        "quotes": [
-          "Can you add option in Edit question page to organize question patterns in 100 question blocks when adding new questions? Also I want give individual name for the question patterns and those should be selectable in Quiz game by user."
-        ]
-      },
-      "acceptanceCriteria": [
-        "Backend exposes a query method to return saved pattern/block names for the authenticated caller and given quizId.",
-        "Backend exposes an update method to set a pattern/block name for the authenticated caller and given quizId + blockIndex.",
-        "Block naming is scoped to the authenticated user (Principal) and quizId (no cross-user leakage)."
-      ]
-    },
-    {
-      "id": "REQ-12",
-      "text": "Update the Edit Questions (QuizEditor) UI to support organizing questions into 100-question blocks. Add a block selector that lets the user choose which 100-question block they are viewing/editing (e.g., \"1–100\", \"101–200\", ...), and display only questions within the selected block range in the editor list.",
+      "id": "REQ-4",
+      "text": "Prevent the Quiz Editor form from resetting unsaved local question edits when the browser tab/window loses focus and then regains focus (e.g., user switches to another page/tab and returns) by ensuring the questions query does not refetch on window focus and overwrite in-progress edits.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-9"
+          "msg-user-1"
         ],
         "quotes": [
-          "add option in Edit question page to organize question patterns in 100 question blocks"
+          "still problem on admin page when editing / adding new question. If I am in process to add text and visit on other browser page, when returning it have refreshed and lost my earlier input for that particular question."
         ]
       },
       "acceptanceCriteria": [
-        "QuizEditor shows a control to select a block and clearly indicates the selected block range (English UI text).",
-        "When a block is selected, only the questions in that 100-question range are shown in the questions accordion list.",
-        "Searching (if enabled) operates within the currently selected block (or clearly indicates otherwise)."
+        "While editing a question (typing in text/answers) without saving, switching to a different tab/window and then returning does not clear or revert the typed inputs.",
+        "This behavior is verified both for plain-text questions and questions that have a JPG attached.",
+        "No new network fetch is triggered solely due to window/tab focus for the questions list used by the editor (unless explicitly refreshed by the user)."
       ]
     },
     {
-      "id": "REQ-13",
-      "text": "In the Edit Questions (QuizEditor) UI, add the ability to assign an individual name to each 100-question block (pattern). The user must be able to edit/save the name for the currently selected block, persisted via the backend, and the name should be shown in the block selector (falling back to the numeric range if unnamed).",
-      "target": "both",
-      "source": {
-        "messageIds": [
-          "msg-9"
-        ],
-        "quotes": [
-          "Also I want give individual name for the question patterns"
-        ]
-      },
-      "acceptanceCriteria": [
-        "User can set/update a block name for the selected block from the editor UI and it persists after refresh/reload.",
-        "Block selector displays saved names (e.g., \"Cardiology (1–100)\") and uses a sensible default label when no name exists.",
-        "All user-facing text is in English."
-      ]
-    },
-    {
-      "id": "REQ-14",
-      "text": "Update the Edit Questions (QuizEditor) \"Add Question\" behavior so that when a block is selected, new questions are added into that block context (i.e., appended within the selected block’s range rather than always appended to the very end of the full quiz). If inserting would split later blocks, reindexing should be handled consistently by using the underlying question array order as the source of truth.",
+      "id": "REQ-5",
+      "text": "Ensure server-fetched questions do not overwrite in-progress local edits in QuizEditor when React Query updates/refetches the questions data (including after background refetches, invalidations, or image attachment flow), by guarding the \"sync localQuestions from questions\" effect so it does not run when there are unsaved changes.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-9"
+          "msg-user-1"
         ],
         "quotes": [
-          "organize question patterns in 100 question blocks when adding new questions"
+          "...when returning it have refreshed and lost my earlier input for that particular question.",
+          "...after I add .jpg in one of my questions, rest of the input start behaving wrong"
         ]
       },
       "acceptanceCriteria": [
-        "When the user is viewing a specific block and clicks \"Add Question\", the newly created question appears within the currently selected block view.",
-        "Saving the quiz persists the updated question order/contents correctly using the existing save mechanism."
+        "If the questions query updates while hasUnsavedChanges is true, the editor keeps the user’s local edits (text/answers/correct answer/image selection) intact.",
+        "After the user presses Save (successful save), the editor state can safely sync to the latest server state again.",
+        "An explicit user action to reload (e.g., existing refetch/refresh control if present) continues to work, and if triggered while unsaved changes exist, the UI must require a clear confirmation before discarding local edits."
       ]
     },
     {
-      "id": "REQ-15",
-      "text": "Update quiz gameplay to allow the user to select which named 100-question block (pattern) to play before starting the quiz session. Gameplay must load and run the quiz only on the questions in the selected block, and the selection UI must display block names (with numeric range fallback).",
-      "target": "both",
-      "source": {
-        "messageIds": [
-          "msg-9"
-        ],
-        "quotes": [
-          "those should be selectable in Quiz game by user."
-        ]
-      },
-      "acceptanceCriteria": [
-        "Before the first question is shown, the user can choose a block/pattern to practice for the current quizId.",
-        "Gameplay only schedules/questions within the selected 100-question block range (not the entire quiz).",
-        "Block list uses saved names from the backend when available and otherwise shows the range label.",
-        "All user-facing text is in English."
-      ]
-    },
-    {
-      "id": "REQ-16",
-      "text": "Add/extend React Query hooks to support: (1) fetching a specific 100-question chunk using the existing backend chunk API, and (2) fetching/updating block (pattern) names for a quiz. Use these hooks in QuizEditor and QuizGameplay.",
+      "id": "REQ-6",
+      "text": "Add draft persistence for in-progress question edits in the Quiz Editor so that accidental reloads or navigations do not lose unsaved input; persist to browser storage keyed by quizId and restore automatically when returning to the editor, with clear English UI text to resume/discard the draft if the server version differs.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-9"
+          "msg-user-1"
         ],
         "quotes": [
-          "those should be selectable in Quiz game by user."
+          "...when returning it have refreshed and lost my earlier input for that particular question."
         ]
       },
       "acceptanceCriteria": [
-        "Frontend has reusable hooks for chunked question fetch (chunkSize=100, chunkIndex=N).",
-        "Frontend has hooks for get/set block names that correctly invalidate and refresh cached data after updates."
+        "While editing without saving, a page refresh (hard reload) restores the in-progress edits for that quizId from browser storage.",
+        "Draft persistence includes question text, answers, correctAnswer, and any attached image ExternalBlob data needed by the editor to continue (or, if an image cannot be restored, the UI clearly indicates the image must be reattached without breaking other draft fields).",
+        "After a successful Save, the stored draft for that quizId is cleared automatically.",
+        "All user-facing prompts/buttons for draft recovery are in English."
       ]
     }
   ],
   "constraints": [
-    "Respect the single-actor backend architecture: all Motoko logic must remain in backend/main.mo.",
-    "Do not edit files under frontend/src/components/ui or any frontend immutablePaths listed in SYSTEM_CONTEXT; only compose/reuse them."
+    "Frontend files under frontend/src/components/ui and the immutable hook files listed in SYSTEM_CONTEXT must not be edited directly; compose existing components instead.",
+    "Keep all backend logic in the single Motoko actor (backend/main.mo); do not introduce additional backend services."
   ],
   "nonGoals": [
-    "Do not implement the earlier \"remember wrong answers and start with weak questions\" feature as part of this request.",
-    "Do not add third-party authentication providers; keep Internet Identity as-is.",
-    "Do not introduce external databases or additional backend services."
+    "Do not add real-time collaboration or multi-device syncing of in-progress drafts.",
+    "Do not change quiz/question data model in the backend unless strictly required for the draft-preservation fix.",
+    "Do not implement support for non-JPG image formats beyond the current JPG/JPEG handling."
   ],
   "imageRequirements": {
     "required": [],

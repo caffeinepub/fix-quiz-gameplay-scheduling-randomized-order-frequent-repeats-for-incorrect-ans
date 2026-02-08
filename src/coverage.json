@@ -1,51 +1,29 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-05T06:00:33.170Z",
+  "generatedAt": "2026-02-08T10:09:10.285Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 6,
-    "implemented": 5,
+    "total": 3,
+    "implemented": 3,
     "items": [
       {
-        "id": "REQ-11",
-        "summary": "Add backend support for storing and retrieving per-user, per-quiz names for 100-question blocks (\"question patterns\"). Implement APIs to (1) fetch all saved block names for a quiz and (2) set/update a specific block name by its 0-based block index (blockIndex = 0 for questions 1–100, 1 for 101–200, etc.).",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-12",
-        "summary": "Update the Edit Questions (QuizEditor) UI to support organizing questions into 100-question blocks. Add a block selector that lets the user choose which 100-question block they are viewing/editing (e.g., \"1–100\", \"101–200\", ...), and display only questions within the selected block range in the editor list.",
+        "id": "REQ-4",
+        "summary": "Prevent the Quiz Editor form from resetting unsaved local question edits when the browser tab/window loses focus and then regains focus (e.g., user switches to another page/tab and returns) by ensuring the questions query does not refetch on window focus and overwrite in-progress edits.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/quiz/blockUtils.ts",
-          "frontend/src/quiz/QuizEditor.tsx"
+          "frontend/src/hooks/useQueries.ts"
         ],
         "matchedFiles": [
-          "frontend/src/quiz/blockUtils.ts",
-          "frontend/src/quiz/QuizEditor.tsx"
+          "frontend/src/hooks/useQueries.ts"
         ]
       },
       {
-        "id": "REQ-13",
-        "summary": "In the Edit Questions (QuizEditor) UI, add the ability to assign an individual name to each 100-question block (pattern). The user must be able to edit/save the name for the currently selected block, persisted via the backend, and the name should be shown in the block selector (falling back to the numeric range if unnamed).",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/quiz/QuizEditor.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/quiz/QuizEditor.tsx"
-        ]
-      },
-      {
-        "id": "REQ-14",
-        "summary": "Update the Edit Questions (QuizEditor) \"Add Question\" behavior so that when a block is selected, new questions are added into that block context (i.e., appended within the selected block’s range rather than always appended to the very end of the full quiz). If inserting would split later blocks, reindexing should be handled consistently by using the underlying question array order as the source of truth.",
+        "id": "REQ-5",
+        "summary": "Ensure server-fetched questions do not overwrite in-progress local edits in QuizEditor when React Query updates/refetches the questions data (including after background refetches, invalidations, or image attachment flow), by guarding the \"sync localQuestions from questions\" effect so it does not run when there are unsaved changes.",
         "status": "implemented",
         "plannedFiles": [
           "frontend/src/quiz/QuizEditor.tsx"
@@ -55,52 +33,31 @@
         ]
       },
       {
-        "id": "REQ-15",
-        "summary": "Update quiz gameplay to allow the user to select which named 100-question block (pattern) to play before starting the quiz session. Gameplay must load and run the quiz only on the questions in the selected block, and the selection UI must display block names (with numeric range fallback).",
+        "id": "REQ-6",
+        "summary": "Add draft persistence for in-progress question edits in the Quiz Editor so that accidental reloads or navigations do not lose unsaved input; persist to browser storage keyed by quizId and restore automatically when returning to the editor, with clear English UI text to resume/discard the draft if the server version differs.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/quiz/QuizGameplay.tsx",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/quiz/blockUtils.ts"
-        ],
-        "matchedFiles": [
-          "frontend/src/quiz/QuizGameplay.tsx",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/quiz/blockUtils.ts"
-        ]
-      },
-      {
-        "id": "REQ-16",
-        "summary": "Add/extend React Query hooks to support: (1) fetching a specific 100-question chunk using the existing backend chunk API, and (2) fetching/updating block (pattern) names for a quiz. Use these hooks in QuizEditor and QuizGameplay.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/quiz/draftStorage.ts",
           "frontend/src/quiz/QuizEditor.tsx",
-          "frontend/src/quiz/QuizGameplay.tsx"
+          "frontend/src/quiz/QuestionImagePicker.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/quiz/draftStorage.ts",
           "frontend/src/quiz/QuizEditor.tsx",
-          "frontend/src/quiz/QuizGameplay.tsx"
+          "frontend/src/quiz/QuestionImagePicker.tsx"
         ]
       }
     ]
   },
   "changedFiles": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/declarations/backend.did.js",
     "frontend/src/hooks/useQueries.ts",
+    "frontend/src/quiz/QuestionImagePicker.tsx",
     "frontend/src/quiz/QuizEditor.tsx",
-    "frontend/src/quiz/QuizGameplay.tsx",
-    "frontend/src/quiz/blockUtils.ts",
+    "frontend/src/quiz/draftStorage.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

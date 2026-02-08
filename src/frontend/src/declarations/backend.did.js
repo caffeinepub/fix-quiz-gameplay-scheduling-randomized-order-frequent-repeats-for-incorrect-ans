@@ -8,24 +8,74 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const _CaffeineStorageCreateCertificateResult = IDL.Record({
+  'method' : IDL.Text,
+  'blob_hash' : IDL.Text,
+});
+export const _CaffeineStorageRefillInformation = IDL.Record({
+  'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
+});
+export const _CaffeineStorageRefillResult = IDL.Record({
+  'success' : IDL.Opt(IDL.Bool),
+  'topped_up_amount' : IDL.Opt(IDL.Nat),
+});
 export const QuizId = IDL.Text;
+export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const Question = IDL.Record({
   'answers' : IDL.Vec(IDL.Text),
   'text' : IDL.Text,
   'correctAnswer' : IDL.Nat,
+  'imageUrl' : IDL.Opt(ExternalBlob),
 });
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
+export const StateSnapshot = IDL.Record({
+  'blockNames' : IDL.Vec(
+    IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text)))
+  ),
+  'version' : IDL.Nat,
+  'questions' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Vec(Question))),
+});
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
-export const ListAllQuizzesResult = IDL.Tuple(QuizId, IDL.Vec(QuizId));
+export const HealthCheckResult = IDL.Record({
+  'backendVersion' : IDL.Nat,
+  'systemTime' : IDL.Int,
+});
 
 export const idlService = IDL.Service({
+  '_caffeineStorageBlobIsLive' : IDL.Func(
+      [IDL.Vec(IDL.Nat8)],
+      [IDL.Bool],
+      ['query'],
+    ),
+  '_caffeineStorageBlobsToDelete' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Vec(IDL.Nat8))],
+      ['query'],
+    ),
+  '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
+      [IDL.Vec(IDL.Vec(IDL.Nat8))],
+      [],
+      [],
+    ),
+  '_caffeineStorageCreateCertificate' : IDL.Func(
+      [IDL.Text],
+      [_CaffeineStorageCreateCertificateResult],
+      [],
+    ),
+  '_caffeineStorageRefillCashier' : IDL.Func(
+      [IDL.Opt(_CaffeineStorageRefillInformation)],
+      [_CaffeineStorageRefillResult],
+      [],
+    ),
+  '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'appendQuestions' : IDL.Func([QuizId, IDL.Vec(Question)], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'exportAllState' : IDL.Func([], [StateSnapshot], []),
   'getAllBlockNames' : IDL.Func(
       [QuizId],
       [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text))],
@@ -47,9 +97,13 @@ export const idlService = IDL.Service({
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'hasAdminRole' : IDL.Func([], [IDL.Bool], ['query']),
+  'healthCheck' : IDL.Func([], [HealthCheckResult], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'listAllQuizzes' : IDL.Func([], [ListAllQuizzesResult], ['query']),
+  'isValidQuizId' : IDL.Func([QuizId], [IDL.Bool], ['query']),
+  'listAllQuizzes' : IDL.Func([], [IDL.Vec(QuizId)], ['query']),
   'renameQuiz' : IDL.Func([QuizId, QuizId], [], []),
+  'restoreState' : IDL.Func([StateSnapshot], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'saveQuestions' : IDL.Func([QuizId, IDL.Vec(Question)], [], []),
   'setBlockName' : IDL.Func([QuizId, IDL.Nat, IDL.Text], [], []),
@@ -58,24 +112,74 @@ export const idlService = IDL.Service({
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const _CaffeineStorageCreateCertificateResult = IDL.Record({
+    'method' : IDL.Text,
+    'blob_hash' : IDL.Text,
+  });
+  const _CaffeineStorageRefillInformation = IDL.Record({
+    'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
+  });
+  const _CaffeineStorageRefillResult = IDL.Record({
+    'success' : IDL.Opt(IDL.Bool),
+    'topped_up_amount' : IDL.Opt(IDL.Nat),
+  });
   const QuizId = IDL.Text;
+  const ExternalBlob = IDL.Vec(IDL.Nat8);
   const Question = IDL.Record({
     'answers' : IDL.Vec(IDL.Text),
     'text' : IDL.Text,
     'correctAnswer' : IDL.Nat,
+    'imageUrl' : IDL.Opt(ExternalBlob),
   });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
+  const StateSnapshot = IDL.Record({
+    'blockNames' : IDL.Vec(
+      IDL.Tuple(IDL.Text, IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text)))
+    ),
+    'version' : IDL.Nat,
+    'questions' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Vec(Question))),
+  });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
-  const ListAllQuizzesResult = IDL.Tuple(QuizId, IDL.Vec(QuizId));
+  const HealthCheckResult = IDL.Record({
+    'backendVersion' : IDL.Nat,
+    'systemTime' : IDL.Int,
+  });
   
   return IDL.Service({
+    '_caffeineStorageBlobIsLive' : IDL.Func(
+        [IDL.Vec(IDL.Nat8)],
+        [IDL.Bool],
+        ['query'],
+      ),
+    '_caffeineStorageBlobsToDelete' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        ['query'],
+      ),
+    '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        [],
+        [],
+      ),
+    '_caffeineStorageCreateCertificate' : IDL.Func(
+        [IDL.Text],
+        [_CaffeineStorageCreateCertificateResult],
+        [],
+      ),
+    '_caffeineStorageRefillCashier' : IDL.Func(
+        [IDL.Opt(_CaffeineStorageRefillInformation)],
+        [_CaffeineStorageRefillResult],
+        [],
+      ),
+    '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'appendQuestions' : IDL.Func([QuizId, IDL.Vec(Question)], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'exportAllState' : IDL.Func([], [StateSnapshot], []),
     'getAllBlockNames' : IDL.Func(
         [QuizId],
         [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text))],
@@ -101,9 +205,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'hasAdminRole' : IDL.Func([], [IDL.Bool], ['query']),
+    'healthCheck' : IDL.Func([], [HealthCheckResult], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'listAllQuizzes' : IDL.Func([], [ListAllQuizzesResult], ['query']),
+    'isValidQuizId' : IDL.Func([QuizId], [IDL.Bool], ['query']),
+    'listAllQuizzes' : IDL.Func([], [IDL.Vec(QuizId)], ['query']),
     'renameQuiz' : IDL.Func([QuizId, QuizId], [], []),
+    'restoreState' : IDL.Func([StateSnapshot], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'saveQuestions' : IDL.Func([QuizId, IDL.Vec(Question)], [], []),
     'setBlockName' : IDL.Func([QuizId, IDL.Nat, IDL.Text], [], []),

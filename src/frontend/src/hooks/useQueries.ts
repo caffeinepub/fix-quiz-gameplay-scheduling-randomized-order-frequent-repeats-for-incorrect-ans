@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
+import { diagnostics } from '../utils/deploymentDiagnostics';
 import type { UserProfile, Question, QuizId } from '../backend';
 
 export function useGetCallerUserProfile() {
@@ -8,7 +9,14 @@ export function useGetCallerUserProfile() {
   const query = useQuery<UserProfile | null>({
     queryKey: ['currentUserProfile'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for getCallerUserProfile',
+          'useGetCallerUserProfile query',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       return actor.getCallerUserProfile();
     },
     enabled: !!actor && !actorFetching,
@@ -28,7 +36,14 @@ export function useSaveCallerUserProfile() {
 
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for saveCallerUserProfile',
+          'useSaveCallerUserProfile mutation',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       return actor.saveCallerUserProfile(profile);
     },
     onSuccess: () => {
@@ -43,8 +58,16 @@ export function useListAllQuizzes() {
   return useQuery<[string, QuizId[]]>({
     queryKey: ['allQuizzes'],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.listAllQuizzes();
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for listAllQuizzes',
+          'useListAllQuizzes query',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
+      const quizzes = await actor.listAllQuizzes();
+      return ['', quizzes] as [string, QuizId[]];
     },
     enabled: !!actor && !actorFetching,
   });
@@ -56,7 +79,14 @@ export function useGetQuestionCount(quizId: QuizId) {
   return useQuery<bigint>({
     queryKey: ['questionCount', quizId],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for getQuestionCount',
+          'useGetQuestionCount query',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       return actor.getQuestionCount(quizId);
     },
     enabled: !!actor && !actorFetching && !!quizId,
@@ -69,7 +99,14 @@ export function useGetAllQuizCounts(quizIds: QuizId[]) {
   return useQuery<Record<QuizId, number>>({
     queryKey: ['allQuizCounts', quizIds.join(',')],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for getAllQuizCounts',
+          'useGetAllQuizCounts query',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       const counts: Record<QuizId, number> = {};
       for (const quizId of quizIds) {
         const count = await actor.getQuestionCount(quizId);
@@ -91,6 +128,7 @@ export function useGetAllQuestions(quizId: QuizId) {
       return actor.getAllQuestions(quizId);
     },
     enabled: !!actor && !actorFetching,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -100,7 +138,14 @@ export function useGetQuestionChunk(quizId: QuizId, blockIndex: number, enabled:
   return useQuery<Question[]>({
     queryKey: ['questionChunk', quizId, blockIndex],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for getQuestionChunk',
+          'useGetQuestionChunk query',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       return actor.getQuestions(quizId, BigInt(100), BigInt(blockIndex));
     },
     enabled: !!actor && !actorFetching && !!quizId && enabled,
@@ -113,7 +158,14 @@ export function useGetFirst20Questions(quizId: QuizId, enabled: boolean = false)
   return useQuery<Question[]>({
     queryKey: ['first20Questions', quizId],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for getFirst20Questions',
+          'useGetFirst20Questions query',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       return actor.getQuestions(quizId, BigInt(20), BigInt(0));
     },
     enabled: !!actor && !actorFetching && !!quizId && enabled,
@@ -126,7 +178,14 @@ export function useGetAllBlockNames(quizId: QuizId) {
   return useQuery<Map<number, string>>({
     queryKey: ['blockNames', quizId],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for getAllBlockNames',
+          'useGetAllBlockNames query',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       const pairs = await actor.getAllBlockNames(quizId);
       const map = new Map<number, string>();
       pairs.forEach(([blockIndex, name]) => {
@@ -144,7 +203,14 @@ export function useSetBlockName(quizId: QuizId) {
 
   return useMutation({
     mutationFn: async ({ blockIndex, blockName }: { blockIndex: number; blockName: string }) => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for setBlockName',
+          'useSetBlockName mutation',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       return actor.setBlockName(quizId, BigInt(blockIndex), blockName);
     },
     onSuccess: () => {
@@ -159,7 +225,14 @@ export function useSaveQuestions(quizId: QuizId) {
 
   return useMutation({
     mutationFn: async (questions: Question[]) => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for saveQuestions',
+          'useSaveQuestions mutation',
+          'actorInit'
+        );
+        throw new Error('Actor not available');
+      }
       return actor.saveQuestions(quizId, questions);
     },
     onSuccess: () => {
@@ -170,5 +243,26 @@ export function useSaveQuestions(quizId: QuizId) {
       queryClient.invalidateQueries({ queryKey: ['first20Questions', quizId] });
       queryClient.invalidateQueries({ queryKey: ['questionChunk', quizId] });
     },
+  });
+}
+
+export function useIsAdmin() {
+  const { actor, isFetching: actorFetching } = useActor();
+
+  return useQuery<boolean>({
+    queryKey: ['isAdmin'],
+    queryFn: async () => {
+      if (!actor) {
+        diagnostics.captureError(
+          'Actor not available for isAdmin check',
+          'useIsAdmin query',
+          'actorInit'
+        );
+        return false;
+      }
+      return actor.hasAdminRole();
+    },
+    enabled: !!actor && !actorFetching,
+    retry: false,
   });
 }

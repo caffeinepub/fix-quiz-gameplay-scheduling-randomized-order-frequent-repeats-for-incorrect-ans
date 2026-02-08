@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGetAllQuestions, useSaveQuestions, useListAllQuizzes, useGetAllQuizCounts, useGetFirst20Questions, useGetQuestionCount, useGetAllBlockNames, useSetBlockName } from '../hooks/useQueries';
 import { useQuizRecovery } from '../hooks/useQuizRecovery';
+import { useExportAllQuestions } from '../hooks/useExportAllQuestions';
+import { downloadJsonFile, generateExportFilename } from '../utils/quizExport';
 import { validateQuestions } from './validation';
 import type { Question, QuizId } from './types';
 import { Button } from '../components/ui/button';
@@ -8,7 +10,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
-import { Plus, Trash2, Save, Play, AlertCircle, Search, RefreshCw, Eye, Edit2, Check, X } from 'lucide-react';
+import { Plus, Trash2, Save, Play, AlertCircle, Search, RefreshCw, Eye, Edit2, Check, X, Download } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -16,8 +18,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from '../components/ui/scroll-area';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
 import TroubleshootingPanel from './TroubleshootingPanel';
 import { getAvailableBlockIndices, getCombinedBlockLabel, getBlockRange } from './blockUtils';
+import QuestionImagePicker from './QuestionImagePicker';
+import { getExternalBlobUrl } from './imageUtils';
+import { ExternalBlob } from '../backend';
+import BackupRestorePanel from './BackupRestorePanel';
+import { saveDraft, loadDraft, clearDraft, hasDraft, getDraftTimestamp } from './draftStorage';
 
 interface QuizEditorProps {
   quizId: QuizId;
@@ -120,8 +128,17 @@ function QuizRecoveryPrompt({
           disabled={!selectedQuizId || isRecovering}
           className="w-full"
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRecovering ? 'animate-spin' : ''}`} />
-          {isRecovering ? 'Restoring...' : 'Restore Questions'}
+          {isRecovering ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Restoring...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Restore Questions
+            </>
+          )}
         </Button>
       </CardContent>
     </Card>
@@ -129,568 +146,569 @@ function QuizRecoveryPrompt({
 }
 
 export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
-  const { data: savedQuestions, isLoading } = useGetAllQuestions(quizId);
-  const { data: questionCountBigInt } = useGetQuestionCount(quizId);
-  const { data: blockNamesMap } = useGetAllBlockNames(quizId);
+  const { data: questions = [], isLoading, refetch } = useGetAllQuestions(quizId);
+  const { data: questionCount = BigInt(0) } = useGetQuestionCount(quizId);
+  const { data: blockNamesMap = new Map() } = useGetAllBlockNames(quizId);
+  const saveQuestionsMutation = useSaveQuestions(quizId);
   const setBlockNameMutation = useSetBlockName(quizId);
-  const saveQuestions = useSaveQuestions(quizId);
+  const { exportAllQuestions, isExporting } = useExportAllQuestions();
 
-  const [questions, setQuestions] = useState<Question[]>([
-    {
-      text: '',
-      answers: ['', ''],
-      correctAnswer: BigInt(0),
-    },
-  ]);
+  const [localQuestions, setLocalQuestions] = useState<Question[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBlock, setSelectedBlock] = useState<number | 'all'>('all');
+  const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null);
+  const [editingBlockName, setEditingBlockName] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewQuestions, setPreviewQuestions] = useState<Question[]>([]);
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [showReloadConfirm, setShowReloadConfirm] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  
+  const initialSyncDone = useRef(false);
+  const lastSavedQuestionsRef = useRef<Question[]>([]);
 
-  const [errors, setErrors] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(0);
-  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
-  const [showFirst20Dialog, setShowFirst20Dialog] = useState(false);
-  const [enableFirst20Fetch, setEnableFirst20Fetch] = useState(false);
-  const [selectedBlockIndex, setSelectedBlockIndex] = useState(0);
-  const [isEditingBlockName, setIsEditingBlockName] = useState(false);
-  const [editBlockName, setEditBlockName] = useState('');
-  const pageSize = 10;
-
-  const { data: first20Questions, isLoading: first20Loading, error: first20Error } = useGetFirst20Questions(quizId, enableFirst20Fetch);
-
-  const totalQuestions = questionCountBigInt ? Number(questionCountBigInt) : questions.length;
-  const availableBlocks = getAvailableBlockIndices(totalQuestions);
-
+  // Initial sync from server or draft restore
   useEffect(() => {
-    if (savedQuestions && savedQuestions.length > 0) {
-      setQuestions(savedQuestions);
-      setShowRestorePrompt(false);
-    } else if (savedQuestions && savedQuestions.length === 0) {
-      setShowRestorePrompt(true);
-    }
-  }, [savedQuestions]);
+    if (initialSyncDone.current) return;
+    if (isLoading) return;
 
-  useEffect(() => {
-    if (first20Questions && enableFirst20Fetch) {
-      setShowFirst20Dialog(true);
-    }
-  }, [first20Questions, enableFirst20Fetch]);
-
-  useEffect(() => {
-    if (first20Error && enableFirst20Fetch) {
-      toast.error('Failed to load first 20 questions');
-      setEnableFirst20Fetch(false);
-    }
-  }, [first20Error, enableFirst20Fetch]);
-
-  // Filter questions by selected block
-  const blockRange = getBlockRange(selectedBlockIndex);
-  const questionsInBlock = questions.slice(blockRange.start, blockRange.end);
-
-  const filteredQuestions = questionsInBlock.filter(q =>
-    q.text.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalPages = Math.ceil(filteredQuestions.length / pageSize);
-  const startIndex = currentPage * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, filteredQuestions.length);
-  const displayedQuestions = filteredQuestions.slice(startIndex, endIndex);
-
-  const updateQuestion = (globalIndex: number, field: 'text', value: string) => {
-    const newQuestions = [...questions];
-    newQuestions[globalIndex] = { ...newQuestions[globalIndex], [field]: value };
-    setQuestions(newQuestions);
-  };
-
-  const updateAnswer = (globalIndex: number, answerIndex: number, value: string) => {
-    const newQuestions = [...questions];
-    const newAnswers = [...newQuestions[globalIndex].answers];
-    newAnswers[answerIndex] = value;
-    newQuestions[globalIndex] = { ...newQuestions[globalIndex], answers: newAnswers };
-    setQuestions(newQuestions);
-  };
-
-  const addAnswer = (globalIndex: number) => {
-    const newQuestions = [...questions];
-    if (newQuestions[globalIndex].answers.length < 6) {
-      newQuestions[globalIndex] = {
-        ...newQuestions[globalIndex],
-        answers: [...newQuestions[globalIndex].answers, ''],
-      };
-      setQuestions(newQuestions);
-    }
-  };
-
-  const removeAnswer = (globalIndex: number, answerIndex: number) => {
-    const newQuestions = [...questions];
-    if (newQuestions[globalIndex].answers.length > 2) {
-      const newAnswers = newQuestions[globalIndex].answers.filter((_, i) => i !== answerIndex);
-      let correctAnswer = Number(newQuestions[globalIndex].correctAnswer);
-      if (correctAnswer === answerIndex) {
-        correctAnswer = 0;
-      } else if (correctAnswer > answerIndex) {
-        correctAnswer--;
+    // Check for draft on mount
+    if (hasDraft(quizId)) {
+      const draft = loadDraft(quizId);
+      if (draft && draft.length > 0) {
+        setShowDraftDialog(true);
+        return;
       }
-      newQuestions[globalIndex] = {
-        ...newQuestions[globalIndex],
-        answers: newAnswers,
-        correctAnswer: BigInt(correctAnswer),
-      };
-      setQuestions(newQuestions);
+    }
+
+    // No draft, sync from server
+    setLocalQuestions(questions);
+    lastSavedQuestionsRef.current = questions;
+    initialSyncDone.current = true;
+  }, [questions, isLoading, quizId]);
+
+  // Auto-save draft when local questions change (debounced)
+  useEffect(() => {
+    if (!initialSyncDone.current) return;
+    if (!hasUnsavedChanges) return;
+
+    const timeoutId = setTimeout(() => {
+      saveDraft(quizId, localQuestions);
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [localQuestions, hasUnsavedChanges, quizId]);
+
+  const handleResumeDraft = () => {
+    const draft = loadDraft(quizId);
+    if (draft) {
+      setLocalQuestions(draft);
+      setHasUnsavedChanges(true);
+      setDraftLoaded(true);
+      toast.info('Draft restored. Review your changes and save when ready.');
+    }
+    setShowDraftDialog(false);
+    initialSyncDone.current = true;
+  };
+
+  const handleDiscardDraft = () => {
+    clearDraft(quizId);
+    setLocalQuestions(questions);
+    lastSavedQuestionsRef.current = questions;
+    setShowDraftDialog(false);
+    initialSyncDone.current = true;
+    toast.info('Draft discarded. Showing saved questions.');
+  };
+
+  const handleReloadClick = () => {
+    if (hasUnsavedChanges) {
+      setShowReloadConfirm(true);
+    } else {
+      performReload();
     }
   };
 
-  const setCorrectAnswer = (globalIndex: number, answerIndex: number) => {
-    const newQuestions = [...questions];
-    newQuestions[globalIndex] = {
-      ...newQuestions[globalIndex],
-      correctAnswer: BigInt(answerIndex),
-    };
-    setQuestions(newQuestions);
+  const performReload = () => {
+    clearDraft(quizId);
+    setHasUnsavedChanges(false);
+    refetch();
+    setShowReloadConfirm(false);
+    toast.info('Reloaded questions from server.');
   };
 
-  const addQuestion = () => {
-    const newQuestion = {
+  const availableBlocks = getAvailableBlockIndices(localQuestions.length);
+
+  const filteredQuestions = localQuestions.filter((q, index) => {
+    const matchesSearch = searchQuery === '' || 
+      q.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.answers.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    if (selectedBlock === 'all') return matchesSearch;
+    
+    const { start, end } = getBlockRange(selectedBlock);
+    return matchesSearch && index >= start && index < end;
+  });
+
+  const handleAddQuestion = () => {
+    const newQuestion: Question = {
       text: '',
+      imageUrl: undefined,
       answers: ['', ''],
       correctAnswer: BigInt(0),
     };
-    
-    // Insert at the end of the current block
-    const insertIndex = Math.min(blockRange.end, questions.length);
-    const newQuestions = [
-      ...questions.slice(0, insertIndex),
-      newQuestion,
-      ...questions.slice(insertIndex),
-    ];
-    
-    setQuestions(newQuestions);
+    setLocalQuestions([...localQuestions, newQuestion]);
+    setHasUnsavedChanges(true);
   };
 
-  const removeQuestion = (globalIndex: number) => {
-    const newQuestions = questions.filter((_, i) => i !== globalIndex);
-    setQuestions(newQuestions.length > 0 ? newQuestions : [{
-      text: '',
-      answers: ['', ''],
-      correctAnswer: BigInt(0),
-    }]);
+  const handleUpdateQuestion = (index: number, field: keyof Question, value: any) => {
+    const updated = [...localQuestions];
+    updated[index] = { ...updated[index], [field]: value };
+    setLocalQuestions(updated);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleAddAnswer = (questionIndex: number) => {
+    const updated = [...localQuestions];
+    if (updated[questionIndex].answers.length < 6) {
+      updated[questionIndex] = {
+        ...updated[questionIndex],
+        answers: [...updated[questionIndex].answers, ''],
+      };
+      setLocalQuestions(updated);
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleRemoveAnswer = (questionIndex: number, answerIndex: number) => {
+    const updated = [...localQuestions];
+    if (updated[questionIndex].answers.length > 2) {
+      const newAnswers = updated[questionIndex].answers.filter((_, i) => i !== answerIndex);
+      const currentCorrect = Number(updated[questionIndex].correctAnswer);
+      let newCorrect = currentCorrect;
+      
+      if (currentCorrect === answerIndex) {
+        newCorrect = 0;
+      } else if (currentCorrect > answerIndex) {
+        newCorrect = currentCorrect - 1;
+      }
+      
+      updated[questionIndex] = {
+        ...updated[questionIndex],
+        answers: newAnswers,
+        correctAnswer: BigInt(newCorrect),
+      };
+      setLocalQuestions(updated);
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleUpdateAnswer = (questionIndex: number, answerIndex: number, value: string) => {
+    const updated = [...localQuestions];
+    const newAnswers = [...updated[questionIndex].answers];
+    newAnswers[answerIndex] = value;
+    updated[questionIndex] = { ...updated[questionIndex], answers: newAnswers };
+    setLocalQuestions(updated);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleDeleteQuestion = (index: number) => {
+    setLocalQuestions(localQuestions.filter((_, i) => i !== index));
+    setHasUnsavedChanges(true);
   };
 
   const handleSave = async () => {
-    const validationErrors = validateQuestions(questions);
-    if (validationErrors.length > 0) {
-      setErrors(validationErrors.map((e) => e.message));
-      toast.error('Please fix the errors before saving');
+    const errors = validateQuestions(localQuestions);
+    if (errors.length > 0) {
+      toast.error(`Validation failed: ${errors[0].message}`);
       return;
     }
 
-    setErrors([]);
     try {
-      await saveQuestions.mutateAsync(questions);
-      toast.success('Quiz saved successfully!');
+      await saveQuestionsMutation.mutateAsync(localQuestions);
+      toast.success('Questions saved successfully!');
+      setHasUnsavedChanges(false);
+      clearDraft(quizId);
+      lastSavedQuestionsRef.current = localQuestions;
     } catch (error: any) {
-      toast.error(error.message || 'Failed to save quiz');
+      toast.error(error.message || 'Failed to save questions');
     }
   };
 
-  const handleStartQuiz = () => {
-    const validationErrors = validateQuestions(questions);
-    if (validationErrors.length > 0) {
-      setErrors(validationErrors.map((e) => e.message));
-      toast.error('Please fix the errors and save before playing');
-      return;
+  const handleExport = async () => {
+    try {
+      const exportData = await exportAllQuestions();
+      const filename = generateExportFilename();
+      downloadJsonFile(exportData, filename);
+      toast.success('Export downloaded successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to export questions');
     }
-
-    if (!savedQuestions || savedQuestions.length === 0) {
-      toast.error('Please save your quiz before playing');
-      return;
-    }
-
-    onStartQuiz();
   };
 
-  const handleShowFirst20 = () => {
-    setEnableFirst20Fetch(true);
-  };
-
-  const handleCloseFirst20Dialog = () => {
-    setShowFirst20Dialog(false);
-    setEnableFirst20Fetch(false);
-  };
-
-  const handleBlockChange = (value: string) => {
-    setSelectedBlockIndex(parseInt(value));
-    setCurrentPage(0);
-    setSearchTerm('');
-  };
-
-  const handleEditBlockName = () => {
-    const currentName = blockNamesMap?.get(selectedBlockIndex) || '';
-    setEditBlockName(currentName);
-    setIsEditingBlockName(true);
+  const handleStartBlockNameEdit = (blockIndex: number) => {
+    setEditingBlockIndex(blockIndex);
+    setEditingBlockName(blockNamesMap.get(blockIndex) || '');
   };
 
   const handleSaveBlockName = async () => {
+    if (editingBlockIndex === null) return;
+
     try {
       await setBlockNameMutation.mutateAsync({
-        blockIndex: selectedBlockIndex,
-        blockName: editBlockName.trim(),
+        blockIndex: editingBlockIndex,
+        blockName: editingBlockName.trim(),
       });
       toast.success('Block name saved!');
-      setIsEditingBlockName(false);
+      setEditingBlockIndex(null);
+      setEditingBlockName('');
     } catch (error: any) {
       toast.error(error.message || 'Failed to save block name');
     }
   };
 
-  const handleCancelEditBlockName = () => {
-    setIsEditingBlockName(false);
-    setEditBlockName('');
+  const handleCancelBlockNameEdit = () => {
+    setEditingBlockIndex(null);
+    setEditingBlockName('');
   };
 
-  const currentBlockLabel = getCombinedBlockLabel(
-    selectedBlockIndex,
-    blockNamesMap?.get(selectedBlockIndex)
-  );
+  const handlePreview = () => {
+    setPreviewQuestions(localQuestions.slice(0, 20));
+    setShowPreview(true);
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading quiz...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
+  const showRecoveryPrompt = localQuestions.length === 0 && !hasUnsavedChanges;
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <TroubleshootingPanel currentQuizId={quizId} />
+    <div className="space-y-6">
+      <AlertDialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resume Draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes from a previous session. Would you like to resume editing or discard the draft?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDiscardDraft}>Discard Draft</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResumeDraft}>Resume Draft</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {showRestorePrompt && (
-        <QuizRecoveryPrompt 
-          currentQuizId={quizId} 
-          onRecover={() => setShowRestorePrompt(false)} 
-        />
-      )}
+      <AlertDialog open={showReloadConfirm} onOpenChange={setShowReloadConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard Unsaved Changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Reloading will discard all your edits. Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={performReload}>Reload</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold mb-2">Create Your Quiz</h2>
-          <p className="text-muted-foreground">
-            {questions.length} question{questions.length !== 1 ? 's' : ''} • Add and edit questions manually
+          <h2 className="text-2xl sm:text-3xl font-bold">Quiz Editor</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            {Number(questionCount)} question{Number(questionCount) !== 1 ? 's' : ''} total
+            {hasUnsavedChanges && <span className="text-warning ml-2">(unsaved changes)</span>}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleShowFirst20} variant="outline" disabled={first20Loading}>
-            <Eye className="h-4 w-4 mr-2" />
-            {first20Loading ? 'Loading...' : 'Show first 20 questions'}
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={handleReloadClick} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Reload
           </Button>
-          <Button onClick={handleSave} disabled={saveQuestions.isPending}>
-            <Save className="h-4 w-4 mr-2" />
-            {saveQuestions.isPending ? 'Saving...' : 'Save Quiz'}
+          <Button onClick={handleExport} variant="outline" size="sm" disabled={isExporting}>
+            {isExporting ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </>
+            )}
           </Button>
-          <Button onClick={handleStartQuiz} variant="default">
+          <Button onClick={onStartQuiz} variant="outline" size="sm">
             <Play className="h-4 w-4 mr-2" />
             Play Quiz
           </Button>
         </div>
       </div>
 
-      {errors.length > 0 && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            <ul className="list-disc list-inside space-y-1">
-              {errors.slice(0, 5).map((error, i) => (
-                <li key={i}>{error}</li>
-              ))}
-              {errors.length > 5 && <li>...and {errors.length - 5} more errors</li>}
-            </ul>
-          </AlertDescription>
-        </Alert>
-      )}
+      {showRecoveryPrompt && <QuizRecoveryPrompt currentQuizId={quizId} onRecover={refetch} />}
 
-      {/* Block Selector */}
-      {availableBlocks.length > 1 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Question Block</CardTitle>
-            <CardDescription>
-              Select a 100-question block to view and edit. Questions are organized in blocks of 100.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <Label htmlFor="block-select">Select Block</Label>
-                <Select value={String(selectedBlockIndex)} onValueChange={handleBlockChange}>
-                  <SelectTrigger id="block-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBlocks.map((blockIdx) => (
-                      <SelectItem key={blockIdx} value={String(blockIdx)}>
-                        {getCombinedBlockLabel(blockIdx, blockNamesMap?.get(blockIdx))}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {!isEditingBlockName && (
-                <Button variant="outline" size="icon" onClick={handleEditBlockName}>
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-              )}
+      <TroubleshootingPanel currentQuizId={quizId} />
+
+      <BackupRestorePanel />
+
+      {localQuestions.length > 0 && (
+        <>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search questions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
+            <Select value={String(selectedBlock)} onValueChange={(v) => setSelectedBlock(v === 'all' ? 'all' : Number(v))}>
+              <SelectTrigger className="w-full sm:w-[250px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Questions</SelectItem>
+                {availableBlocks.map(blockIndex => {
+                  const customName = blockNamesMap.get(blockIndex);
+                  return (
+                    <SelectItem key={blockIndex} value={String(blockIndex)}>
+                      {getCombinedBlockLabel(blockIndex, customName)}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
 
-            {isEditingBlockName && (
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <Label htmlFor="block-name-input">Block Name</Label>
-                  <Input
-                    id="block-name-input"
-                    value={editBlockName}
-                    onChange={(e) => setEditBlockName(e.target.value)}
-                    placeholder="Enter a name for this block (e.g., Cardiology)"
-                  />
-                </div>
-                <Button
-                  variant="default"
-                  size="icon"
-                  onClick={handleSaveBlockName}
-                  disabled={setBlockNameMutation.isPending}
-                >
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleCancelEditBlockName}
-                  disabled={setBlockNameMutation.isPending}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-
-            <div className="text-sm text-muted-foreground">
-              Currently viewing: <span className="font-medium">{currentBlockLabel}</span>
-              {' • '}
-              {questionsInBlock.length} question{questionsInBlock.length !== 1 ? 's' : ''} in this block
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Search and Add Question */}
-      <div className="mb-4 flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search questions in current block..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(0);
-            }}
-            className="pl-9"
-          />
-        </div>
-        <Button onClick={addQuestion}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Question
-        </Button>
-      </div>
-
-      {/* Questions List */}
-      <Accordion type="single" collapsible className="space-y-4">
-        {displayedQuestions.map((question) => {
-          const globalIndex = questions.indexOf(question);
-          return (
-            <AccordionItem key={globalIndex} value={`question-${globalIndex}`} className="border rounded-lg">
-              <AccordionTrigger className="px-4 hover:no-underline">
-                <div className="flex items-center gap-3 text-left flex-1">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm shrink-0">
-                    {globalIndex + 1}
-                  </div>
-                  <span className="font-medium flex-1">
-                    {question.text || `Question ${globalIndex + 1}`}
-                  </span>
-                  {questions.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeQuestion(globalIndex);
-                      }}
-                      className="shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
+          {selectedBlock !== 'all' && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">
+                    Block Name: {getCombinedBlockLabel(selectedBlock, blockNamesMap.get(selectedBlock))}
+                  </CardTitle>
+                  {editingBlockIndex === selectedBlock ? (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="ghost" onClick={handleSaveBlockName}>
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={handleCancelBlockNameEdit}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => handleStartBlockNameEdit(selectedBlock)}>
+                      <Edit2 className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <div className="space-y-4 pt-2">
-                  <div className="space-y-2">
-                    <Label htmlFor={`question-${globalIndex}`}>Question Text</Label>
-                    <Input
-                      id={`question-${globalIndex}`}
-                      value={question.text}
-                      onChange={(e) => updateQuestion(globalIndex, 'text', e.target.value)}
-                      placeholder="Enter your question"
-                    />
-                  </div>
+              </CardHeader>
+              {editingBlockIndex === selectedBlock && (
+                <CardContent>
+                  <Input
+                    placeholder="Enter block name (e.g., Cardiology)"
+                    value={editingBlockName}
+                    onChange={(e) => setEditingBlockName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveBlockName();
+                      if (e.key === 'Escape') handleCancelBlockNameEdit();
+                    }}
+                    autoFocus
+                  />
+                </CardContent>
+              )}
+            </Card>
+          )}
 
-                  <div className="space-y-3">
-                    <Label>Answer Choices (select the correct one)</Label>
-                    <RadioGroup
-                      value={String(question.correctAnswer)}
-                      onValueChange={(value) => setCorrectAnswer(globalIndex, parseInt(value))}
-                    >
-                      {question.answers.map((answer, aIndex) => (
-                        <div key={aIndex} className="flex items-center gap-2">
-                          <RadioGroupItem value={String(aIndex)} id={`q${globalIndex}-a${aIndex}`} />
-                          <Input
-                            value={answer}
-                            onChange={(e) => updateAnswer(globalIndex, aIndex, e.target.value)}
-                            placeholder={`Answer ${aIndex + 1}`}
-                            className="flex-1"
-                          />
-                          {question.answers.length > 2 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeAnswer(globalIndex, aIndex)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+          <Accordion type="single" collapsible className="space-y-2">
+            {filteredQuestions.map((question, displayIndex) => {
+              const actualIndex = localQuestions.indexOf(question);
+              return (
+                <AccordionItem key={actualIndex} value={`question-${actualIndex}`} className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3 text-left flex-1">
+                      <Badge variant="outline">#{actualIndex + 1}</Badge>
+                      <span className="truncate">
+                        {question.text || question.imageUrl ? (
+                          question.text || '[Image Question]'
+                        ) : (
+                          <span className="text-muted-foreground italic">Empty question</span>
+                        )}
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Question Text</Label>
+                      <Input
+                        value={question.text}
+                        onChange={(e) => handleUpdateQuestion(actualIndex, 'text', e.target.value)}
+                        placeholder="Enter question text (optional if image is provided)"
+                      />
+                    </div>
+
+                    <QuestionImagePicker
+                      imageUrl={question.imageUrl}
+                      onImageChange={(blob) => handleUpdateQuestion(actualIndex, 'imageUrl', blob)}
+                      questionIndex={actualIndex}
+                    />
+
+                    <div className="space-y-3">
+                      <Label>Answers</Label>
+                      {question.answers.map((answer, answerIndex) => (
+                        <div key={answerIndex} className="flex gap-2 items-start">
+                          <div className="flex-1 space-y-2">
+                            <Input
+                              value={answer}
+                              onChange={(e) => handleUpdateAnswer(actualIndex, answerIndex, e.target.value)}
+                              placeholder={`Answer ${answerIndex + 1}`}
+                            />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveAnswer(actualIndex, answerIndex)}
+                            disabled={question.answers.length <= 2}
+                            className="shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       ))}
-                    </RadioGroup>
-                    {question.answers.length < 6 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addAnswer(globalIndex)}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Answer
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+                      {question.answers.length < 6 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddAnswer(actualIndex)}
+                          className="w-full"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Answer
+                        </Button>
+                      )}
+                    </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1}-{endIndex} of {filteredQuestions.length}
-            {searchTerm && ` (filtered from ${questionsInBlock.length} in block)`}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-              disabled={currentPage === 0}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
-              disabled={currentPage === totalPages - 1}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+                    <div className="space-y-2">
+                      <Label>Correct Answer</Label>
+                      <RadioGroup
+                        value={String(question.correctAnswer)}
+                        onValueChange={(value) => handleUpdateQuestion(actualIndex, 'correctAnswer', BigInt(value))}
+                      >
+                        {question.answers.map((answer, answerIndex) => (
+                          <div key={answerIndex} className="flex items-center space-x-2">
+                            <RadioGroupItem value={String(answerIndex)} id={`q${actualIndex}-a${answerIndex}`} />
+                            <Label htmlFor={`q${actualIndex}-a${answerIndex}`} className="cursor-pointer">
+                              {answer || `Answer ${answerIndex + 1}`}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteQuestion(actualIndex)}
+                      className="w-full"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Question
+                    </Button>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        </>
       )}
 
-      {/* First 20 Questions Dialog */}
-      <Dialog open={showFirst20Dialog} onOpenChange={handleCloseFirst20Dialog}>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button onClick={handleAddQuestion} className="flex-1">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Question
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={!hasUnsavedChanges || saveQuestionsMutation.isPending}
+          variant="default"
+          className="flex-1"
+        >
+          {saveQuestionsMutation.isPending ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </>
+          )}
+        </Button>
+      </div>
+
+      {localQuestions.length > 0 && (
+        <Button onClick={handlePreview} variant="outline" className="w-full">
+          <Eye className="h-4 w-4 mr-2" />
+          Preview First 20 Questions
+        </Button>
+      )}
+
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-3xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle>First 20 Questions</DialogTitle>
+            <DialogTitle>Preview - First 20 Questions</DialogTitle>
             <DialogDescription>
-              {first20Questions && first20Questions.length > 0
-                ? `Showing ${first20Questions.length} question${first20Questions.length !== 1 ? 's' : ''}`
-                : 'No questions found'}
+              Review the first 20 questions of your quiz
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="h-[60vh] pr-4">
-            {first20Loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading questions...</p>
-                </div>
-              </div>
-            ) : first20Questions && first20Questions.length > 0 ? (
-              <div className="space-y-6">
-                {first20Questions.map((question, index) => (
-                  <Card key={index}>
-                    <CardHeader>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Badge variant="outline" className="shrink-0">
-                          {index + 1}
-                        </Badge>
-                        {question.text}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-muted-foreground mb-2">Answers:</p>
-                        {question.answers.map((answer, aIndex) => (
-                          <div
-                            key={aIndex}
-                            className={`p-2 rounded-md border ${
-                              Number(question.correctAnswer) === aIndex
-                                ? 'bg-success/10 border-success text-success-foreground'
-                                : 'bg-muted/50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-xs">
-                                {String.fromCharCode(65 + aIndex)}.
-                              </span>
-                              <span className="text-sm">{answer}</span>
-                              {Number(question.correctAnswer) === aIndex && (
-                                <Badge variant="outline" className="ml-auto text-xs bg-success/20 border-success">
-                                  Correct
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+            <div className="space-y-6">
+              {previewQuestions.map((q, index) => (
+                <Card key={index}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Question {index + 1}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {q.text && <p className="font-medium">{q.text}</p>}
+                    {q.imageUrl && (
+                      <div className="rounded-lg overflow-hidden border">
+                        <img
+                          src={q.imageUrl.getDirectURL()}
+                          alt={`Question ${index + 1}`}
+                          className="w-full h-auto"
+                        />
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center py-12">
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>No Questions</AlertTitle>
-                  <AlertDescription>
-                    This quiz doesn't have any questions yet.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            )}
+                    )}
+                    <div className="space-y-2">
+                      {q.answers.map((answer, answerIndex) => (
+                        <div
+                          key={answerIndex}
+                          className={`p-3 rounded-lg border ${
+                            Number(q.correctAnswer) === answerIndex
+                              ? 'bg-success/10 border-success'
+                              : 'bg-muted/50'
+                          }`}
+                        >
+                          {answer}
+                          {Number(q.correctAnswer) === answerIndex && (
+                            <Badge variant="outline" className="ml-2">Correct</Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>

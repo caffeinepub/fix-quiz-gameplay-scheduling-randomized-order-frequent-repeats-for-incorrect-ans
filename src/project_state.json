@@ -1,188 +1,36 @@
 {
   "schemaVersion": "1.0.0",
-  "projectStateVersion": 63,
-  "summary": "ICP (Internet Computer) full-stack Motoko + React app scaffold with Internet Identity authentication/authorization, profile setup, an adaptive quiz experience (editor, gameplay, results), and PDF import tooling for quiz question extraction—packaged with a reusable build/deploy template and shared UI component library.",
+  "projectStateVersion": 3,
+  "summary": "New project",
+  "architectural_notes": [
+    "Admin question editor should preserve in-progress form state across tab/page navigation (avoid refresh/reset; consider draft persistence)."
+  ],
+  "known_issues": [
+    "Admin page: while adding/editing a question, switching to another browser page and returning refreshes the form and loses unsaved input; started after adding a .jpg to a question."
+  ],
+  "isFixRequest": true,
   "existing_features": [
     {
-      "id": "IF-1",
-      "title": "Motoko backend canister scaffold with main entrypoint",
-      "synonyms": [
-        "backend canister",
-        "Motoko service"
-      ],
-      "description": "Core Motoko backend canister structure wired via backend/main.mo and supporting modules.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-2",
-      "title": "Authorization & access control layer (Motoko)",
-      "synonyms": [
-        "authz",
-        "ACL",
-        "authorization mixin"
-      ],
-      "description": "Backend authorization modules including mixin-based authorization and access control utilities.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-3",
-      "title": "React frontend scaffold (Vite) with Tailwind styling",
-      "synonyms": [
-        "frontend app",
-        "Vite React"
-      ],
-      "description": "React/Vite frontend app structure with Tailwind configuration and global styling.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-4",
-      "title": "Internet Identity login integration",
-      "synonyms": [
-        "II auth",
-        "Internet Identity"
-      ],
-      "description": "Frontend hooks/components for authenticating via Internet Identity and creating an authenticated actor to call the backend canister.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-5",
-      "title": "Profile setup UI",
-      "synonyms": [
-        "user onboarding",
-        "profile form"
-      ],
-      "description": "Frontend profile setup flow and related UI components.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-6",
-      "title": "Quiz editor",
-      "synonyms": [
-        "quiz authoring"
-      ],
-      "description": "UI for creating/editing quizzes with validation utilities and type definitions.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-7",
-      "title": "Quiz gameplay flow",
-      "synonyms": [
-        "quiz runner"
-      ],
-      "description": "UI and logic for playing a quiz session, including session types and scheduling support.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-8",
-      "title": "Quiz results view",
-      "synonyms": [
-        "results screen"
-      ],
-      "description": "UI for presenting quiz outcomes/results after gameplay.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-9",
-      "title": "Adaptive scheduling logic for quizzes",
-      "synonyms": [
-        "adaptive scheduler",
-        "spaced repetition"
-      ],
-      "description": "Adaptive scheduler module used to drive quiz session behavior.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-10",
-      "title": "Frontend-to-backend canister bindings and actor utilities",
-      "synonyms": [
-        "did bindings",
-        "agent actor"
-      ],
-      "description": "Generated DID JS/TS bindings and frontend helpers (useActor/useQueries/backend client) to call the backend canister.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-11",
-      "title": "Reusable UI component library (shadcn/ui set)",
-      "synonyms": [
-        "component kit",
-        "UI primitives"
-      ],
-      "description": "A large set of reusable UI primitives/components under build-template/src/frontend/src/components/ui used by the app/template.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-12",
-      "title": "Build/deploy template for ICP project export",
-      "synonyms": [
-        "build template",
-        "Docker/deploy scripts",
-        "icp.yaml"
-      ],
-      "description": "Project build template including Dockerfile, deploy script, canister yamls, workspace tooling, and image tooling scripts.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "IF-13",
-      "title": "PDF import for quiz question extraction (frontend)",
-      "synonyms": [
-        "PDF quiz import",
-        "PDF-to-questions",
-        "pdfImport"
-      ],
-      "description": "Frontend PDF import flow including text extraction, parsing, preview, and typed structures to convert PDF content into quiz questions usable by the quiz editor.",
-      "reqIds": [],
-      "version": 1
-    },
-    {
-      "id": "feature-update-the-edit-questions-quizeditor-ui-to-support-organizing-questions-into-100-question-blocks-add-a-block-selector-that-lets-the-user-choose-which-100-question-block-they-are-viewing-editing-e-g-1-100-101-200-and-display-only-questions-within-the-selected-block-range-in-the-editor-list",
-      "title": "Update the Edit Questions (QuizEditor) UI to support organizing questions into 100-question blocks. Add a block selector that lets the user choose which 100-question block they are viewing/editing (e.g., \"1–100\", \"101–200\", ...), and display only questions within the selected block range in the editor list.",
+      "id": "feature-prevent-the-quiz-editor-form-from-resetting-unsaved-local-question-edits-when-the-browser-tab-window-loses-focus-and-then-regains-focus-e-g-user-switches-to-another-page-tab-and-returns-by-ensuring-the-questions-query-does-not-refetch-on-window-focus-and-overwrite-in-progress-edits",
+      "title": "Prevent the Quiz Editor form from resetting unsaved local question edits when the browser tab/window loses focus and then regains focus (e.g., user switches to another page/tab and returns) by ensuring the questions query does not refetch on window focus and overwrite in-progress edits.",
       "reqIds": [
-        "REQ-12"
+        "REQ-4"
       ],
       "version": 1
     },
     {
-      "id": "feature-in-the-edit-questions-quizeditor-ui-add-the-ability-to-assign-an-individual-name-to-each-100-question-block-pattern-the-user-must-be-able-to-edit-save-the-name-for-the-currently-selected-block-persisted-via-the-backend-and-the-name-should-be-shown-in-the-block-selector-falling-back-to-the-numeric-range-if-unnamed",
-      "title": "In the Edit Questions (QuizEditor) UI, add the ability to assign an individual name to each 100-question block (pattern). The user must be able to edit/save the name for the currently selected block, persisted via the backend, and the name should be shown in the block selector (falling back to the numeric range if unnamed).",
+      "id": "feature-ensure-server-fetched-questions-do-not-overwrite-in-progress-local-edits-in-quizeditor-when-react-query-updates-refetches-the-questions-data-including-after-background-refetches-invalidations-or-image-attachment-flow-by-guarding-the-sync-localquestions-from-questions-effect-so-it-does-not-run-when-there-are-unsaved-changes",
+      "title": "Ensure server-fetched questions do not overwrite in-progress local edits in QuizEditor when React Query updates/refetches the questions data (including after background refetches, invalidations, or image attachment flow), by guarding the \"sync localQuestions from questions\" effect so it does not run when there are unsaved changes.",
       "reqIds": [
-        "REQ-13"
+        "REQ-5"
       ],
       "version": 1
     },
     {
-      "id": "feature-update-the-edit-questions-quizeditor-add-question-behavior-so-that-when-a-block-is-selected-new-questions-are-added-into-that-block-context-i-e-appended-within-the-selected-block-s-range-rather-than-always-appended-to-the-very-end-of-the-full-quiz-if-inserting-would-split-later-blocks-reindexing-should-be-handled-consistently-by-using-the-underlying-question-array-order-as-the-source-of-truth",
-      "title": "Update the Edit Questions (QuizEditor) \"Add Question\" behavior so that when a block is selected, new questions are added into that block context (i.e., appended within the selected block’s range rather than always appended to the very end of the full quiz). If inserting would split later blocks, reindexing should be handled consistently by using the underlying question array order as the source of truth.",
+      "id": "feature-add-draft-persistence-for-in-progress-question-edits-in-the-quiz-editor-so-that-accidental-reloads-or-navigations-do-not-lose-unsaved-input-persist-to-browser-storage-keyed-by-quizid-and-restore-automatically-when-returning-to-the-editor-with-clear-english-ui-text-to-resume-discard-the-draft-if-the-server-version-differs",
+      "title": "Add draft persistence for in-progress question edits in the Quiz Editor so that accidental reloads or navigations do not lose unsaved input; persist to browser storage keyed by quizId and restore automatically when returning to the editor, with clear English UI text to resume/discard the draft if the server version differs.",
       "reqIds": [
-        "REQ-14"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-update-quiz-gameplay-to-allow-the-user-to-select-which-named-100-question-block-pattern-to-play-before-starting-the-quiz-session-gameplay-must-load-and-run-the-quiz-only-on-the-questions-in-the-selected-block-and-the-selection-ui-must-display-block-names-with-numeric-range-fallback",
-      "title": "Update quiz gameplay to allow the user to select which named 100-question block (pattern) to play before starting the quiz session. Gameplay must load and run the quiz only on the questions in the selected block, and the selection UI must display block names (with numeric range fallback).",
-      "reqIds": [
-        "REQ-15"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-add-extend-react-query-hooks-to-support-1-fetching-a-specific-100-question-chunk-using-the-existing-backend-chunk-api-and-2-fetching-updating-block-pattern-names-for-a-quiz-use-these-hooks-in-quizeditor-and-quizgameplay",
-      "title": "Add/extend React Query hooks to support: (1) fetching a specific 100-question chunk using the existing backend chunk API, and (2) fetching/updating block (pattern) names for a quiz. Use these hooks in QuizEditor and QuizGameplay.",
-      "reqIds": [
-        "REQ-16"
+        "REQ-6"
       ],
       "version": 1
     }
@@ -190,126 +38,12 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Add login/start options to prioritize previously weak/wrong-answered questions at the beginning of a new quiz session (per-user performance persistence).",
+      "summary": "Fix admin page question editor losing unsaved input when navigating away/returning (regression after adding .jpg image)",
       "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Support grouping/splitting large question sets into selectable 100-question blocks for both editing and gameplay (user can choose which block/pattern to work on).",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Persist per-user, per-quiz question performance so the app can recognize a returning user and identify previously weak questions (e.g., questions answered incorrectly) in later sessions.",
-      "reqIds": [
-        "REQ-1"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-4",
-      "summary": "Add backend APIs to record quiz session performance so the frontend can update the stored weak-question stats after gameplay.",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-5",
-      "summary": "Add a gameplay start option (user-facing text in English) to prioritize previously weak questions at the beginning of a quiz session, using the persisted performance data when available.",
-      "reqIds": [
-        "REQ-3"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-6",
-      "summary": "Implement 100-question block selection for quiz gameplay so the user can choose which 100-question block to practice (e.g., 1–100, 101–200, etc.), and run the quiz only on that selected block.",
-      "reqIds": [
-        "REQ-4"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-7",
-      "summary": "Implement 100-question block selection for the Edit Questions page so the user can filter/edit questions by 100-question blocks, and can switch blocks without losing unsaved edits (prompt user to save or discard changes).",
-      "reqIds": [
-        "REQ-5"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-8",
-      "summary": "Add backend support for efficient 100-question block workflows by enabling chunked read/write of questions for a quiz, so editing and gameplay can work with large quizzes without requiring full quiz loads.",
-      "reqIds": [
-        "REQ-6"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-9",
-      "summary": "Add backend persistence to remember, per authenticated user and per quizId, which question indexes were answered incorrectly, so that returning users can be recognized and their previously-wrong questions can be retrieved later.",
-      "reqIds": [
-        "REQ-7"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-10",
-      "summary": "Expose backend APIs to (1) fetch the stored wrong-answer question indexes for a given quizId and (2) update stored wrong-answer state when the user answers a question during gameplay (mark a question as wrong when answered incorrectly; remove it from the wrong list when answered correctly).",
-      "reqIds": [
-        "REQ-8"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-11",
-      "summary": "Update the quiz gameplay flow to fetch the stored wrong-answer question indexes at the start of the session and schedule those questions first before the rest of the quiz questions.",
-      "reqIds": [
-        "REQ-9"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-12",
-      "summary": "During quiz gameplay, record answer outcomes to the backend so the stored wrong-answer list stays up-to-date for the next session.",
-      "reqIds": [
-        "REQ-10"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-13",
-      "summary": "Allow users to assign custom names to 100-question blocks/patterns in the Edit Questions page, and make those named patterns selectable by the user in quiz gameplay.",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-14",
-      "summary": "Add backend support for storing and retrieving per-user, per-quiz names for 100-question blocks (\"question patterns\"). Implement APIs to (1) fetch all saved block names for a quiz and (2) set/update a specific block name by its 0-based block index (blockIndex = 0 for questions 1–100, 1 for 101–200, etc.).",
-      "reqIds": [
-        "REQ-11"
-      ],
       "status": "pending"
     }
   ],
-  "architectural_notes": [
-    "Architecture: Internet Computer app with Motoko backend canister and React/Vite frontend.",
-    "Auth: Internet Identity used for user authentication; frontend creates authenticated canister actors.",
-    "Backend includes modular authorization/access-control helpers.",
-    "Frontend uses Tailwind + shadcn/ui component primitives.",
-    "Quiz domain split into editor, gameplay, results with shared types/validation and an adaptive scheduler.",
-    "Includes reusable build/export template with deploy scripts and canister configuration (icp.yaml, canister.yaml).",
-    "Quiz editor includes a PDF import pipeline (text extraction -> parsing -> preview -> typed question structures) to bootstrap quizzes from PDFs.",
-    "Build template now includes monorepo workspace plumbing (pnpm-workspace), frontend tooling configs (ESLint config + custom rules, Vite/Tailwind/PostCSS), and standardized canister.yaml/env.json scaffolding.",
-    "Build template adds image maintenance scripts (prune-unused-images, resize-images) and refreshed deploy/build scripts/Dockerfile for exportable ICP projects.",
-    "Components updated/standardized: authorization layer v4.0.0; core infrastructure v1.0.2; shadcn/ui set v1.0.0; build-template-react v1.0.0; initial-app v1.0.0; github-export-icp-cli v1.0.0."
-  ],
-  "known_issues": [],
-  "isFixRequest": false,
-  "projectName": "Add weak-question prioritization across sessions + 100-question block selection for edit and play",
+  "projectName": "Prevent Quiz Editor from losing unsaved question edits when switching tabs (regression after adding JPG)",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

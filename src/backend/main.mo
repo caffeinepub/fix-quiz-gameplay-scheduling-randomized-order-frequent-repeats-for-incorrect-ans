@@ -3,18 +3,24 @@ import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Array "mo:core/Array";
 import Iter "mo:core/Iter";
+import Time "mo:core/Time";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
-import Migration "migration";
-import MixinAuthorization "authorization/MixinAuthorization";
-import AccessControl "authorization/access-control";
 
-// Backward migration (with full path due to code generation) and forward migration (empty) are required to prevent loss of persistent state during upgrades. Do not remove.
-(with migration = Migration.run)
+import Storage "blob-storage/Storage";
+import MixinStorage "blob-storage/Mixin";
+
+import AccessControl "authorization/access-control";
+import MixinAuthorization "authorization/MixinAuthorization";
+
+
+
+
 actor {
-  // Initialize the user system state
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
+
+  include MixinStorage();
 
   public type UserProfile = {
     name : Text;
@@ -23,7 +29,7 @@ actor {
   let userProfiles = Map.empty<Principal, UserProfile>();
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access profiles");
     };
     userProfiles.get(caller);
@@ -37,53 +43,46 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can save profiles");
     };
     userProfiles.add(caller, profile);
   };
 
-  public type Questions = [Question];
   public type Question = {
     text : Text;
+    imageUrl : ?Storage.ExternalBlob;
     answers : [Text];
     correctAnswer : Nat;
   };
 
   public type QuizId = Text;
   public type ListAllQuizzesResult = (QuizId, [QuizId]);
-  public type ListAllQuizzesInput = Principal;
 
-  let quizSets = Map.empty<Principal, Map.Map<Text, [Question]>>();
+  let quizSets = Map.empty<Text, [Question]>();
+  let blockNames = Map.empty<Text, Map.Map<Nat, Text>>();
 
-  // New block names state variable; Mapping: Principal (User) -> QuizId -> BlockIndex -> BlockName (Text)
-  let blockNames = Map.empty<Principal, Map.Map<Text, Map.Map<Nat, Text>>>();
-
-  public query ({ caller }) func listAllQuizzes() : async ListAllQuizzesResult {
+  public query ({ caller }) func isValidQuizId(quizId : QuizId) : async Bool {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access quiz data");
     };
-    let results : [Text] = switch (quizSets.get(caller)) {
-      case (null) { [] };
-      case (?questionsSetsMap) {
-        questionsSetsMap.keys().toArray();
-      };
+    quizSets.containsKey(quizId);
+  };
+
+  public query ({ caller }) func listAllQuizzes() : async [QuizId] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can access quiz data");
     };
-    (caller.toText(), results);
+    quizSets.keys().toArray();
   };
 
   public query ({ caller }) func getQuestionCount(quizId : QuizId) : async Nat {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access quiz data");
     };
-    switch (quizSets.get(caller)) {
+    switch (quizSets.get(quizId)) {
       case (null) { 0 };
-      case (?questionsSetsMap) {
-        switch (questionsSetsMap.get(quizId)) {
-          case (null) { 0 };
-          case (?questions) { questions.size() };
-        };
-      };
+      case (?questions) { questions.size() };
     };
   };
 
@@ -91,14 +90,9 @@ actor {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access quiz data");
     };
-    switch (quizSets.get(caller)) {
+    switch (quizSets.get(quizId)) {
       case (null) { [] };
-      case (?questionsSetsMap) {
-        switch (questionsSetsMap.get(quizId)) {
-          case (null) { [] };
-          case (?questions) { questions };
-        };
-      };
+      case (?questions) { questions };
     };
   };
 
@@ -106,151 +100,188 @@ actor {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access quiz data");
     };
-    switch (quizSets.get(caller)) {
+    switch (quizSets.get(quizId)) {
       case (null) { [] };
-      case (?questionsSetsMap) {
-        switch (questionsSetsMap.get(quizId)) {
-          case (null) { [] };
-          case (?questions) {
-            let startIndex = chunkIndex * chunkSize;
-            if (startIndex > questions.size()) { return [] };
-            let filteredQuestions = questions.values().drop(startIndex);
-            filteredQuestions.take(chunkSize).toArray();
-          };
-        };
+      case (?questions) {
+        let startIndex = chunkIndex * chunkSize;
+        if (startIndex > questions.size()) { return [] };
+        let filteredQuestions = questions.values().drop(startIndex);
+        filteredQuestions.take(chunkSize).toArray();
       };
     };
   };
 
   public query ({ caller }) func getQuestion(quizId : QuizId, questionId : Nat) : async ?Question {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access quiz data");
     };
-    switch (quizSets.get(caller)) {
+    switch (quizSets.get(quizId)) {
       case (null) { null };
-      case (?questionSetsMap) {
-        switch (questionSetsMap.get(quizId)) {
-          case (null) { null };
-          case (?questions) {
-            if (questionId >= questions.size()) {
-              return null;
-            };
-            ?questions[questionId];
-          };
+      case (?questions) {
+        if (questionId >= questions.size()) {
+          return null;
         };
+        ?questions[questionId];
       };
     };
   };
 
+  /// Returns admin role assignment status.
+  /// Accessible to all users including guests to check their own status.
+  public query ({ caller }) func hasAdminRole() : async Bool {
+    AccessControl.hasPermission(accessControlState, caller, #admin);
+  };
+
   public shared ({ caller }) func saveQuestions(quizId : QuizId, questionsInput : [Question]) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can save questions");
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can manage questions");
     };
-    let newQuestionsMap = switch (quizSets.get(caller)) {
-      case (null) { Map.empty<QuizId, Questions>() };
-      case (?existingQuestionsMap) { existingQuestionsMap };
-    };
-    newQuestionsMap.add(quizId, questionsInput);
-    quizSets.add(caller, newQuestionsMap);
+    quizSets.add(quizId, questionsInput);
   };
 
   public shared ({ caller }) func appendQuestions(quizId : QuizId, newQuestions : [Question]) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can modify questions");
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can manage questions");
     };
-    let newQuestionsMap = switch (quizSets.get(caller)) {
-      case (null) { Map.empty<QuizId, Questions>() };
-      case (?existingQuestionsMap) { existingQuestionsMap };
-    };
-    let existingQuestions = switch (newQuestionsMap.get(quizId)) {
+    let existingQuestions = switch (quizSets.get(quizId)) {
       case (null) { [] : [Question] };
       case (?existing) { existing };
     };
     let combinedQuestions = existingQuestions.concat(newQuestions);
-    newQuestionsMap.add(quizId, combinedQuestions);
-    quizSets.add(caller, newQuestionsMap);
+    quizSets.add(quizId, combinedQuestions);
   };
 
   public shared ({ caller }) func renameQuiz(oldQuizId : QuizId, newQuizId : QuizId) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can modify questions");
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can manage quizzes");
     };
-    let preparedQuestionsMap = switch (quizSets.get(caller)) {
-      case (null) { Map.empty<QuizId, Questions>() };
-      case (?existingQuestionsMap) { existingQuestionsMap };
-    };
-    switch (preparedQuestionsMap.get(oldQuizId)) {
+    switch (quizSets.get(oldQuizId)) {
       case (null) {
         Runtime.trap("No questions found for this quiz set");
       };
       case (?questions) {
-        if (preparedQuestionsMap.containsKey(newQuizId)) {
+        if (quizSets.containsKey(newQuizId)) {
           Runtime.trap("Quiz ID already exists");
         };
-        preparedQuestionsMap.add(newQuizId, questions);
-        preparedQuestionsMap.remove(oldQuizId);
-        quizSets.add(caller, preparedQuestionsMap);
+        quizSets.add(newQuizId, questions);
+        quizSets.remove(oldQuizId);
       };
     };
   };
 
-  // Save or update a block name for a specific quiz and block index
   public shared ({ caller }) func setBlockName(quizId : QuizId, blockIndex : Nat, blockName : Text) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Runtime.trap("Unauthorized: Only users can save block names");
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can manage block names");
     };
 
-    let userBlockNames = switch (blockNames.get(caller)) {
-      case (null) { Map.empty<QuizId, Map.Map<Nat, Text>>() };
-      case (?existing) { existing };
-    };
-
-    let quizBlockNames = switch (userBlockNames.get(quizId)) {
+    let quizBlockNames = switch (blockNames.get(quizId)) {
       case (null) { Map.empty<Nat, Text>() };
       case (?existing) { existing };
     };
 
     quizBlockNames.add(blockIndex, blockName);
-    userBlockNames.add(quizId, quizBlockNames);
-    blockNames.add(caller, userBlockNames);
+    blockNames.add(quizId, quizBlockNames);
   };
 
-  // Retrieve all block names for a specific quiz
   public query ({ caller }) func getAllBlockNames(quizId : QuizId) : async [(Nat, Text)] {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access block names");
     };
 
-    let userBlockNames = switch (blockNames.get(caller)) {
-      case (null) { Map.empty<QuizId, Map.Map<Nat, Text>>() };
+    let quizBlockNames = switch (blockNames.get(quizId)) {
+      case (null) { Map.empty<Nat, Text>() };
       case (?existing) { existing };
     };
 
-    switch (userBlockNames.get(quizId)) {
-      case (null) { [] };
-      case (?quizBlockNames) {
-        let pairs = quizBlockNames.toArray();
-        pairs;
-      };
-    };
+    quizBlockNames.toArray();
   };
 
-  // Get a specific block name for a quiz and block index
   public query ({ caller }) func getBlockName(quizId : QuizId, blockIndex : Nat) : async ?Text {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access block names");
     };
 
-    let userBlockNames = switch (blockNames.get(caller)) {
-      case (null) { Map.empty<QuizId, Map.Map<Nat, Text>>() };
+    let quizBlockNames = switch (blockNames.get(quizId)) {
+      case (null) { Map.empty<Nat, Text>() };
       case (?existing) { existing };
     };
 
-    switch (userBlockNames.get(quizId)) {
-      case (null) { null };
-      case (?quizBlockNames) {
-        quizBlockNames.get(blockIndex);
-      };
+    quizBlockNames.get(blockIndex);
+  };
+
+  public type StateSnapshot = {
+    version : Nat;
+    questions : [(Text, [Question])];
+    blockNames : [(Text, [(Nat, Text)])];
+  };
+
+  func convertQuestionsToImmutable(mutable : [(Text, [Question])]) : [(Text, [Question])] {
+    mutable.map<(Text, [Question]), (Text, [Question])>(
+      func((quizId, array)) { (quizId, array) }
+    );
+  };
+
+  func convertBlockNamesToImmutable(mutable : [(Text, Map.Map<Nat, Text>)]) : [(Text, [(Nat, Text)])] {
+    mutable.map<(Text, Map.Map<Nat, Text>), (Text, [(Nat, Text)])>(
+      func((quizId, map)) {
+        (quizId, map.toArray());
+      }
+    );
+  };
+
+  func convertQuestionsToMutable(immutable : [(Text, [Question])]) : [(Text, [Question])] {
+    immutable.map<(Text, [Question]), (Text, [Question])>(
+      func((quizId, array)) { (quizId, array) }
+    );
+  };
+
+  func convertBlockNamesToMutable(immutable : [(Text, [(Nat, Text)])]) : [(Text, Map.Map<Nat, Text>)] {
+    immutable.map<(Text, [(Nat, Text)]), (Text, Map.Map<Nat, Text>)>(
+      func((quizId, innerArray)) {
+        (quizId, Map.fromArray(innerArray));
+      }
+    );
+  };
+
+  public shared ({ caller }) func exportAllState() : async StateSnapshot {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can export state");
+    };
+
+    {
+      version = 2;
+      questions = convertQuestionsToImmutable(quizSets.toArray());
+      blockNames = convertBlockNamesToImmutable(blockNames.toArray());
+    };
+  };
+
+  public shared ({ caller }) func restoreState(exportedState : StateSnapshot) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can restore state");
+    };
+    if (exportedState.version != 1 and exportedState.version != 2) {
+      Runtime.trap("Unsupported export format");
+    };
+    quizSets.clear();
+    for ((quizId, questions) in convertQuestionsToMutable(exportedState.questions).values()) {
+      quizSets.add(quizId, questions);
+    };
+    blockNames.clear();
+    for ((quizId, map) in convertBlockNamesToMutable(exportedState.blockNames).values()) {
+      blockNames.add(quizId, map);
+    };
+  };
+
+  public type HealthCheckResult = {
+    systemTime : Int;
+    backendVersion : Nat;
+  };
+
+  /// Public endpoint for basic health check (unauthenticated)
+  public query ({ caller }) func healthCheck() : async HealthCheckResult {
+    {
+      systemTime = Time.now();
+      backendVersion = 2;
     };
   };
 };

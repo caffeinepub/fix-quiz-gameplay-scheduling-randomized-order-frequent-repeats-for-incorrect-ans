@@ -5,7 +5,7 @@ export interface QuestionPerformance {
   incorrectCount: number;
   lastResult: 'correct' | 'incorrect' | null;
   everMissed: boolean; // Track if this question was ever answered incorrectly
-  postCorrectRepeatsNeeded: number; // How many more times to show after first correct (for previously missed questions)
+  correctAfterMissCount: number; // Count of correct answers after first miss (need 2 to master)
   lastShownAt: number; // Submission count when last shown (for spacing repeats)
 }
 

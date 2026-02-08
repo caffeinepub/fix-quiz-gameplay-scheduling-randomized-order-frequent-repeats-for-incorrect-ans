@@ -23,10 +23,11 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * Adaptive scheduler with randomized initial order and frequent repeats for missed questions.
+ * Adaptive scheduler with mastery-based repeats.
  * - Questions appear in random order on first pass
  * - Incorrectly answered questions can repeat during first pass within < 4 subsequent questions
- * - Previously-wrong questions repeat 1-2 more times after being answered correctly
+ * - Previously-missed questions must be answered correctly twice to reach mastery
+ * - Once mastered, questions stop repeating for the remainder of the session
  * - Minimum 2-question spacing prevents immediate back-to-back repeats
  */
 export class AdaptiveScheduler {
@@ -55,7 +56,7 @@ export class AdaptiveScheduler {
         incorrectCount: 0,
         lastResult: null,
         everMissed: false,
-        postCorrectRepeatsNeeded: 0,
+        correctAfterMissCount: 0,
         lastShownAt: -1,
       });
     }
@@ -75,18 +76,19 @@ export class AdaptiveScheduler {
       perf.correctCount++;
       perf.lastResult = 'correct';
       
-      // If this question was previously missed and this is the first correct answer after being wrong
-      if (perf.everMissed && perf.postCorrectRepeatsNeeded === 0 && perf.incorrectCount > 0) {
-        // Schedule 1-2 additional repeats after this correct answer
-        perf.postCorrectRepeatsNeeded = Math.floor(Math.random() * 2) + 1; // 1 or 2
-      } else if (perf.postCorrectRepeatsNeeded > 0) {
-        // Decrement post-correct repeats counter
-        perf.postCorrectRepeatsNeeded--;
+      // If this question was previously missed, count this correct answer toward mastery
+      if (perf.everMissed && perf.correctAfterMissCount < 2) {
+        perf.correctAfterMissCount++;
       }
     } else {
       perf.incorrectCount++;
       perf.lastResult = 'incorrect';
-      perf.everMissed = true;
+      
+      // Mark as missed (if first time)
+      if (!perf.everMissed) {
+        perf.everMissed = true;
+        perf.correctAfterMissCount = 0; // Reset mastery counter
+      }
     }
   }
 
@@ -100,7 +102,14 @@ export class AdaptiveScheduler {
   }
 
   /**
-   * Get questions that need repeating (incorrect or post-correct repeats pending)
+   * Check if a previously-missed question needs more correct answers to reach mastery
+   */
+  private needsMastery(perf: QuestionPerformance): boolean {
+    return perf.everMissed && perf.correctAfterMissCount < 2;
+  }
+
+  /**
+   * Get questions that need repeating (not yet mastered)
    * During first pass: only include questions that should reappear within < 4 questions
    */
   private getRepeatCandidates(excludeCurrentId?: number, duringFirstPass: boolean = false): number[] {
@@ -122,6 +131,11 @@ export class AdaptiveScheduler {
         continue;
       }
       
+      // Only include if needs mastery (previously missed and < 2 correct after miss)
+      if (!this.needsMastery(perf)) {
+        continue;
+      }
+      
       // During first pass: only include if within soonness threshold
       if (duringFirstPass) {
         const questionsSinceLastShown = this.state.submissionCount - perf.lastShownAt;
@@ -131,10 +145,7 @@ export class AdaptiveScheduler {
         }
       }
       
-      // Include if: has incorrect answers OR needs post-correct repeats
-      if (perf.incorrectCount > 0 || perf.postCorrectRepeatsNeeded > 0) {
-        candidates.push(questionId);
-      }
+      candidates.push(questionId);
     }
     
     return candidates;
@@ -147,7 +158,7 @@ export class AdaptiveScheduler {
    * 2. Next unanswered question (in randomized initial order)
    * 
    * After first pass:
-   * - Questions needing repeats (incorrect or post-correct), prioritizing those with more incorrect answers
+   * - Questions needing mastery (previously missed, < 2 correct after miss)
    */
   getNextQuestion(excludeCurrentId?: number): number {
     // Check if we're still in first pass (have unanswered questions)
@@ -160,19 +171,19 @@ export class AdaptiveScheduler {
       const repeatCandidates = this.getRepeatCandidates(excludeCurrentId, true);
       
       if (repeatCandidates.length > 0) {
-        // Prioritize by incorrect count (more incorrect = higher priority)
+        // Prioritize by mastery progress (fewer correct after miss = higher priority)
         repeatCandidates.sort((a, b) => {
           const perfA = this.state.performance.get(a)!;
           const perfB = this.state.performance.get(b)!;
           
-          // Primary: more incorrect answers = higher priority
-          if (perfB.incorrectCount !== perfA.incorrectCount) {
-            return perfB.incorrectCount - perfA.incorrectCount;
+          // Primary: fewer correct after miss = higher priority
+          if (perfA.correctAfterMissCount !== perfB.correctAfterMissCount) {
+            return perfA.correctAfterMissCount - perfB.correctAfterMissCount;
           }
           
-          // Secondary: questions needing post-correct repeats
-          if (perfB.postCorrectRepeatsNeeded !== perfA.postCorrectRepeatsNeeded) {
-            return perfB.postCorrectRepeatsNeeded - perfA.postCorrectRepeatsNeeded;
+          // Secondary: more incorrect answers = higher priority
+          if (perfB.incorrectCount !== perfA.incorrectCount) {
+            return perfB.incorrectCount - perfA.incorrectCount;
           }
           
           // Tertiary: prefer questions shown longer ago
@@ -226,19 +237,19 @@ export class AdaptiveScheduler {
       return 0;
     }
     
-    // Prioritize by incorrect count (more incorrect = higher priority)
+    // Prioritize by mastery progress (fewer correct after miss = higher priority)
     repeatCandidates.sort((a, b) => {
       const perfA = this.state.performance.get(a)!;
       const perfB = this.state.performance.get(b)!;
       
-      // Primary: more incorrect answers = higher priority
-      if (perfB.incorrectCount !== perfA.incorrectCount) {
-        return perfB.incorrectCount - perfA.incorrectCount;
+      // Primary: fewer correct after miss = higher priority
+      if (perfA.correctAfterMissCount !== perfB.correctAfterMissCount) {
+        return perfA.correctAfterMissCount - perfB.correctAfterMissCount;
       }
       
-      // Secondary: questions needing post-correct repeats
-      if (perfB.postCorrectRepeatsNeeded !== perfA.postCorrectRepeatsNeeded) {
-        return perfB.postCorrectRepeatsNeeded - perfA.postCorrectRepeatsNeeded;
+      // Secondary: more incorrect answers = higher priority
+      if (perfB.incorrectCount !== perfA.incorrectCount) {
+        return perfB.incorrectCount - perfA.incorrectCount;
       }
       
       // Tertiary: rotation for tie-breaking
@@ -247,9 +258,9 @@ export class AdaptiveScheduler {
     
     // Use rotation to cycle through top-priority candidates
     const topPriority = repeatCandidates[0];
-    const topIncorrectCount = this.state.performance.get(topPriority)!.incorrectCount;
+    const topCorrectAfterMiss = this.state.performance.get(topPriority)!.correctAfterMissCount;
     const topCandidates = repeatCandidates.filter(
-      qId => this.state.performance.get(qId)!.incorrectCount === topIncorrectCount
+      qId => this.state.performance.get(qId)!.correctAfterMissCount === topCorrectAfterMiss
     );
     
     const selectedIndex = this.state.rotationIndex % topCandidates.length;
@@ -268,7 +279,7 @@ export class AdaptiveScheduler {
   /**
    * Check if the session is complete:
    * - All questions attempted at least once
-   * - No pending repeats (no incorrect answers and no post-correct repeats needed)
+   * - All previously-missed questions have reached mastery (2 correct answers after miss)
    */
   isSessionComplete(): boolean {
     for (const perf of this.state.performance.values()) {
@@ -277,8 +288,8 @@ export class AdaptiveScheduler {
         return false;
       }
       
-      // Has pending repeats
-      if (perf.incorrectCount > 0 || perf.postCorrectRepeatsNeeded > 0) {
+      // Previously-missed question that hasn't reached mastery yet
+      if (this.needsMastery(perf)) {
         return false;
       }
     }

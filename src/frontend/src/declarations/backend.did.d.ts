@@ -10,21 +10,58 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export type ListAllQuizzesResult = [QuizId, Array<QuizId>];
+export type ExternalBlob = Uint8Array;
+export interface HealthCheckResult {
+  'backendVersion' : bigint,
+  'systemTime' : bigint,
+}
 export interface Question {
   'answers' : Array<string>,
   'text' : string,
   'correctAnswer' : bigint,
+  'imageUrl' : [] | [ExternalBlob],
 }
 export type QuizId = string;
+export interface StateSnapshot {
+  'blockNames' : Array<[string, Array<[bigint, string]>]>,
+  'version' : bigint,
+  'questions' : Array<[string, Array<Question>]>,
+}
 export interface UserProfile { 'name' : string }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface _CaffeineStorageCreateCertificateResult {
+  'method' : string,
+  'blob_hash' : string,
+}
+export interface _CaffeineStorageRefillInformation {
+  'proposed_top_up_amount' : [] | [bigint],
+}
+export interface _CaffeineStorageRefillResult {
+  'success' : [] | [boolean],
+  'topped_up_amount' : [] | [bigint],
+}
 export interface _SERVICE {
+  '_caffeineStorageBlobIsLive' : ActorMethod<[Uint8Array], boolean>,
+  '_caffeineStorageBlobsToDelete' : ActorMethod<[], Array<Uint8Array>>,
+  '_caffeineStorageConfirmBlobDeletion' : ActorMethod<
+    [Array<Uint8Array>],
+    undefined
+  >,
+  '_caffeineStorageCreateCertificate' : ActorMethod<
+    [string],
+    _CaffeineStorageCreateCertificateResult
+  >,
+  '_caffeineStorageRefillCashier' : ActorMethod<
+    [[] | [_CaffeineStorageRefillInformation]],
+    _CaffeineStorageRefillResult
+  >,
+  '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'appendQuestions' : ActorMethod<[QuizId, Array<Question>], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'exportAllState' : ActorMethod<[], StateSnapshot>,
   'getAllBlockNames' : ActorMethod<[QuizId], Array<[bigint, string]>>,
   'getAllQuestions' : ActorMethod<[QuizId], Array<Question>>,
   'getBlockName' : ActorMethod<[QuizId, bigint], [] | [string]>,
@@ -34,9 +71,20 @@ export interface _SERVICE {
   'getQuestionCount' : ActorMethod<[QuizId], bigint>,
   'getQuestions' : ActorMethod<[QuizId, bigint, bigint], Array<Question>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  /**
+   * / Returns admin role assignment status.
+   * / Accessible to all users including guests to check their own status.
+   */
+  'hasAdminRole' : ActorMethod<[], boolean>,
+  /**
+   * / Public endpoint for basic health check (unauthenticated)
+   */
+  'healthCheck' : ActorMethod<[], HealthCheckResult>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
-  'listAllQuizzes' : ActorMethod<[], ListAllQuizzesResult>,
+  'isValidQuizId' : ActorMethod<[QuizId], boolean>,
+  'listAllQuizzes' : ActorMethod<[], Array<QuizId>>,
   'renameQuiz' : ActorMethod<[QuizId, QuizId], undefined>,
+  'restoreState' : ActorMethod<[StateSnapshot], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'saveQuestions' : ActorMethod<[QuizId, Array<Question>], undefined>,
   'setBlockName' : ActorMethod<[QuizId, bigint, string], undefined>,

@@ -28,18 +28,24 @@ export default function LoginButton() {
   };
 
   return (
-    <Button onClick={handleAuth} disabled={disabled} variant={isAuthenticated ? 'outline' : 'default'}>
+    <Button 
+      onClick={handleAuth} 
+      disabled={disabled} 
+      variant={isAuthenticated ? 'outline' : 'default'}
+      size="sm"
+      className="text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
+    >
       {loginStatus === 'logging-in' ? (
-        'Logging in...'
+        <span className="hidden sm:inline">Logging in...</span>
       ) : isAuthenticated ? (
         <>
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
+          <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Logout</span>
         </>
       ) : (
         <>
-          <LogIn className="h-4 w-4 mr-2" />
-          Login
+          <LogIn className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Login</span>
         </>
       )}
     </Button>
