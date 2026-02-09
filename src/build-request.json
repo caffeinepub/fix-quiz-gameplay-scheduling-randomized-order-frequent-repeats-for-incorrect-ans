@@ -1,76 +1,82 @@
 {
   "kind": "build_request",
-  "title": "Prevent Quiz Editor from losing unsaved question edits when switching tabs (regression after adding JPG)",
+  "title": "Rollback app behavior to match Version 56 and label build as v56",
   "priority": "high",
   "requirements": [
     {
-      "id": "REQ-4",
-      "text": "Prevent the Quiz Editor form from resetting unsaved local question edits when the browser tab/window loses focus and then regains focus (e.g., user switches to another page/tab and returns) by ensuring the questions query does not refetch on window focus and overwrite in-progress edits.",
+      "id": "REQ-1",
+      "text": "Restore the application’s UI styling and layout to match Version 56 by removing/undoing the styling/layout changes introduced in later versions (notably Version 58+), ensuring a consistent neutral Shadcn/Tailwind look across the app shell and quiz-related screens (including PreGameQuestionCountView, PreQuizSummaryView, and QuizResults).",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-user-1"
+          "msg-3"
         ],
         "quotes": [
-          "still problem on admin page when editing / adding new question. If I am in process to add text and visit on other browser page, when returning it have refreshed and lost my earlier input for that particular question."
+          "please return in version 56, as newer versions is ruined."
         ]
       },
       "acceptanceCriteria": [
-        "While editing a question (typing in text/answers) without saving, switching to a different tab/window and then returning does not clear or revert the typed inputs.",
-        "This behavior is verified both for plain-text questions and questions that have a JPG attached.",
-        "No new network fetch is triggered solely due to window/tab focus for the questions list used by the editor (unless explicitly refreshed by the user)."
+        "PreGameQuestionCountView, PreQuizSummaryView, and QuizResults use the same neutral Shadcn/Tailwind visual treatment (spacing, typography, surfaces, and borders) as the Version 56 baseline.",
+        "No new styling/layout regressions are introduced in the app shell and core quiz flow screens compared to the intended Version 56 look."
       ]
     },
     {
-      "id": "REQ-5",
-      "text": "Ensure server-fetched questions do not overwrite in-progress local edits in QuizEditor when React Query updates/refetches the questions data (including after background refetches, invalidations, or image attachment flow), by guarding the \"sync localQuestions from questions\" effect so it does not run when there are unsaved changes.",
+      "id": "REQ-2",
+      "text": "Restore Version 56 header navigation behavior so that the “Play” and “Edit” header actions are visible throughout the start flow and non-game views, and are hidden only while the user is actively in the in-game question-answering screen (the active quiz step).",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-user-1"
+          "msg-3"
         ],
         "quotes": [
-          "...when returning it have refreshed and lost my earlier input for that particular question.",
-          "...after I add .jpg in one of my questions, rest of the input start behaving wrong"
+          "please return in version 56, as newer versions is ruined."
         ]
       },
       "acceptanceCriteria": [
-        "If the questions query updates while hasUnsavedChanges is true, the editor keeps the user’s local edits (text/answers/correct answer/image selection) intact.",
-        "After the user presses Save (successful save), the editor state can safely sync to the latest server state again.",
-        "An explicit user action to reload (e.g., existing refetch/refresh control if present) continues to work, and if triggered while unsaved changes exist, the UI must require a clear confirmation before discarding local edits."
+        "When the user is in any non-question-answering view (e.g., editor, pre-game/start flow, results, wrong answers review), the header shows the Play action and (for admins) the Edit action.",
+        "While actively answering questions (the in-game question-answering screen), the header Play/Edit actions are hidden.",
+        "Switching between views reliably updates header visibility without requiring a page refresh."
       ]
     },
     {
-      "id": "REQ-6",
-      "text": "Add draft persistence for in-progress question edits in the Quiz Editor so that accidental reloads or navigations do not lose unsaved input; persist to browser storage keyed by quizId and restore automatically when returning to the editor, with clear English UI text to resume/discard the draft if the server version differs.",
+      "id": "REQ-3",
+      "text": "Update the build/version identity shown in the UI to report Version 56 (e.g., the footer build version and any diagnostics build info), so the published build is clearly labeled as v56.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-user-1"
+          "msg-3"
         ],
         "quotes": [
-          "...when returning it have refreshed and lost my earlier input for that particular question."
+          "please return in version 56, as newer versions is ruined."
         ]
       },
       "acceptanceCriteria": [
-        "While editing without saving, a page refresh (hard reload) restores the in-progress edits for that quizId from browser storage.",
-        "Draft persistence includes question text, answers, correctAnswer, and any attached image ExternalBlob data needed by the editor to continue (or, if an image cannot be restored, the UI clearly indicates the image must be reattached without breaking other draft fields).",
-        "After a successful Save, the stored draft for that quizId is cleared automatically.",
-        "All user-facing prompts/buttons for draft recovery are in English."
+        "The build version displayed in the BuildIdentityFooter is \"v56\".",
+        "Any build version shown in deployment/diagnostics UI reflects \"56\" consistently for the same build."
       ]
     }
   ],
   "constraints": [
-    "Frontend files under frontend/src/components/ui and the immutable hook files listed in SYSTEM_CONTEXT must not be edited directly; compose existing components instead.",
-    "Keep all backend logic in the single Motoko actor (backend/main.mo); do not introduce additional backend services."
+    "Do not edit files under frontend/immutablePaths: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useInternetIdentity.tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, frontend/src/components/ui.",
+    "Backend must remain a single Motoko actor in backend/main.mo; add backend/migration.mo only if a state schema upgrade is required."
   ],
   "nonGoals": [
-    "Do not add real-time collaboration or multi-device syncing of in-progress drafts.",
-    "Do not change quiz/question data model in the backend unless strictly required for the draft-preservation fix.",
-    "Do not implement support for non-JPG image formats beyond the current JPG/JPEG handling."
+    "Adding new product features beyond restoring Version 56 look/behavior.",
+    "Changing authentication provider (Internet Identity only).",
+    "Introducing new backend services, databases, or external integrations."
   ],
   "imageRequirements": {
     "required": [],
     "edits": []
+  },
+  "userProfileUpdate": {
+    "goalsToAdd": [],
+    "goalsToRemove": [],
+    "preferencesToAdd": [],
+    "preferencesToRemove": [],
+    "miscToAdd": [],
+    "miscToRemove": [],
+    "fieldsToSet": {},
+    "fieldsToDelete": []
   }
 }

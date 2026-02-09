@@ -1,64 +1,91 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Quiz Editor: prevent unsaved question edits loss on focus/refetch + draft persistence",
+  "title": "Rollback UI/behavior to Version 56 and label build as v56",
   "requirements": [
     {
-      "id": "REQ-4",
-      "summary": "Stop the Quiz Editor questions query from refetching on window/tab focus so in-progress edits are not overwritten.",
+      "id": "REQ-1",
+      "summary": "Restore Version 56 neutral Shadcn/Tailwind styling and layout across app shell and quiz flow screens (PreGameQuestionCountView, PreQuizSummaryView, QuizResults).",
       "acceptanceCriteria": [
-        "While editing a question (typing in text/answers) without saving, switching to a different tab/window and then returning does not clear or revert the typed inputs.",
-        "This behavior is verified both for plain-text questions and questions that have a JPG attached.",
-        "No new network fetch is triggered solely due to window/tab focus for the questions list used by the editor (unless explicitly refreshed by the user)."
+        "PreGameQuestionCountView, PreQuizSummaryView, and QuizResults use the same neutral Shadcn/Tailwind visual treatment (spacing, typography, surfaces, and borders) as the Version 56 baseline.",
+        "No new styling/layout regressions are introduced in the app shell and core quiz flow screens compared to the intended Version 56 look."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Update the React Query configuration for the editor’s questions list (useGetAllQuestions) to disable refetching solely due to window/tab focus (e.g., refetchOnWindowFocus: false) so focus changes cannot trigger a fetch that overwrites local edits."
+          "description": "Revert app shell layout/styling to the Version 56 baseline (header/footer spacing, container widths, background/surface usage) to maintain a neutral shadcn/ui + Tailwind look. Use the shadcn-ui component library (e.g., Card/Button/Alert patterns already in use) to keep surfaces and typography consistent. Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/quiz/PreGameQuestionCountView.tsx",
+          "operation": "modify",
+          "description": "Adjust spacing/typography/surfaces/borders to match the Version 56 neutral styling (e.g., container padding, Card spacing, button grouping) while continuing to use shadcn/ui primitives (Card, Button, Slider, Alert, Skeleton). Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/quiz/PreQuizSummaryView.tsx",
+          "operation": "modify",
+          "description": "Align summary screen visual treatment with Version 56 (consistent Card sections, border usage, spacing, and typography) using existing shadcn/ui components. Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/quiz/QuizResults.tsx",
+          "operation": "modify",
+          "description": "Revert results screen styling to Version 56 neutral treatment (score layout, muted surfaces, spacing, and button stack) using shadcn/ui primitives consistently. Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "operation": "modify",
+          "description": "Remove/undo any post-v56 gameplay layout/styling deviations that affect the overall quiz flow look-and-feel (e.g., overly custom gameplay container styling, non-neutral surface/border treatments) to keep a consistent shadcn/Tailwind appearance around the pre-game and results experience. Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/index.css",
+          "operation": "modify",
+          "description": "Revert/adjust any global CSS utilities introduced after v56 that alter the quiz flow layout/styling (including .quiz-gameplay-* helpers) so the overall UI matches the Version 56 neutral Shadcn/Tailwind baseline without regressions."
         }
       ]
     },
     {
-      "id": "REQ-5",
-      "summary": "Guard syncing localQuestions from server questions so background React Query updates never overwrite unsaved local edits; add explicit reload confirmation when unsaved changes exist.",
+      "id": "REQ-2",
+      "summary": "Restore Version 56 header navigation visibility: Play/Edit shown in non-question-answering views and hidden only during the active in-game question-answering step.",
       "acceptanceCriteria": [
-        "If the questions query updates while hasUnsavedChanges is true, the editor keeps the user’s local edits (text/answers/correct answer/image selection) intact.",
-        "After the user presses Save (successful save), the editor state can safely sync to the latest server state again.",
-        "An explicit user action to reload (e.g., existing refetch/refresh control if present) continues to work, and if triggered while unsaved changes exist, the UI must require a clear confirmation before discarding local edits."
+        "When the user is in any non-question-answering view (e.g., editor, pre-game/start flow, results, wrong answers review), the header shows the Play action and (for admins) the Edit action.",
+        "While actively answering questions (the in-game question-answering screen), the header Play/Edit actions are hidden.",
+        "Switching between views reliably updates header visibility without requiring a page refresh."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/quiz/QuizEditor.tsx",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Change the effect that currently does setLocalQuestions(questions) on every questions update to only sync when there are no unsaved changes (and/or when the user explicitly confirmed discarding edits). Add an explicit Reload/Refresh action that calls the existing refetch, but if hasUnsavedChanges is true, present a confirmation dialog before discarding local edits and applying the newly fetched server state."
+          "description": "Adjust header visibility logic to match Version 56: show Play/Edit throughout start flow and non-game views, and hide only while the user is in the active question-answering step. Ensure state updates correctly when switching between gameplay sub-steps, results, wrong-answers review, and editor (no refresh required). Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "operation": "modify",
+          "description": "Ensure the gameplay step-change notification to the app shell only indicates 'active quiz' during the in-game question-answering step (not during block selection/question count/summary), so header Play/Edit actions remain visible throughout the start flow per v56. Verify the component's usage instructions before implementing."
         }
       ]
     },
     {
-      "id": "REQ-6",
-      "summary": "Persist Quiz Editor in-progress question edits as a per-quiz draft in browser storage and restore it after reload/navigation with English resume/discard UI.",
+      "id": "REQ-3",
+      "summary": "Update UI build/version identity to display Version 56 (v56) consistently in footer and diagnostics.",
       "acceptanceCriteria": [
-        "While editing without saving, a page refresh (hard reload) restores the in-progress edits for that quizId from browser storage.",
-        "Draft persistence includes question text, answers, correctAnswer, and any attached image ExternalBlob data needed by the editor to continue (or, if an image cannot be restored, the UI clearly indicates the image must be reattached without breaking other draft fields).",
-        "After a successful Save, the stored draft for that quizId is cleared automatically.",
-        "All user-facing prompts/buttons for draft recovery are in English."
+        "The build version displayed in the BuildIdentityFooter is \"v56\".",
+        "Any build version shown in deployment/diagnostics UI reflects \"56\" consistently for the same build."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/quiz/draftStorage.ts",
-          "operation": "create",
-          "description": "Implement browser draft persistence utilities keyed by quizId (save/load/clear + lightweight server-version comparison). Include safe serialization for Question fields and best-effort image restoration using ExternalBlob direct URLs where possible (blob: URLs should be treated as non-restorable). Use the blob-storage ExternalBlob capability (ExternalBlob.getDirectURL / ExternalBlob.fromURL) for restorable images. Verify the component's usage instructions before implementing."
+          "path": "frontend/src/utils/buildStamp.ts",
+          "operation": "modify",
+          "description": "Set the app’s build/version identity source to report Version 56 consistently (including default/fallback version behavior) so all UI consumers read \"56\" for this build."
         },
         {
-          "path": "frontend/src/quiz/QuizEditor.tsx",
+          "path": "frontend/src/components/BuildIdentityFooter.tsx",
           "operation": "modify",
-          "description": "Wire draft persistence into the editor: (1) on localQuestions changes while unsaved, persist a draft (debounced) to browser storage keyed by quizId; (2) on mount, check for an existing draft and restore it; if the stored draft indicates the server version differs, show an English dialog offering Resume draft / Discard draft; (3) if an image cannot be restored, keep other fields and show clear English inline text indicating the image must be reattached; (4) on successful Save, clear the stored draft for that quizId."
+          "description": "Ensure the footer renders the build version exactly as \"v56\" (consistent formatting and no conflicting prefixes) based on the shared build info source. Verify the component's usage instructions before implementing."
         },
         {
-          "path": "frontend/src/quiz/QuestionImagePicker.tsx",
+          "path": "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
           "operation": "modify",
-          "description": "Adjust image-picker UX to support draft restore expectations: when the editor signals an image is missing/unrestorable after draft restore, show clear English guidance (without breaking existing fields). Keep using blob-storage ExternalBlob behavior for previews via getDirectURL when available. Verify the component's usage instructions before implementing."
+          "description": "Ensure diagnostics UI displays Version 56 consistently wherever build/version is shown, using the shared build info source (no mismatched formatting between panels). Verify the component's usage instructions before implementing."
         }
       ]
     }

@@ -1,477 +1,383 @@
 import { useState, useEffect } from 'react';
-import { useGetQuestionChunk, useGetQuestionCount, useGetAllBlockNames } from '../hooks/useQueries';
-import { useQuestionTranslation } from '../hooks/useQuestionTranslation';
-import { AdaptiveScheduler } from './adaptiveScheduler';
-import type { SessionState, QuestionPerformance } from './sessionTypes';
-import type { Question, QuizId } from './types';
+import { useGetAllQuestions, useGetAllBlockNames } from '../hooks/useQueries';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Progress } from '../components/ui/progress';
-import { CheckCircle, XCircle, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
-import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
-import { toast } from 'sonner';
-import { getAvailableBlockIndices, getCombinedBlockLabel } from './blockUtils';
-import { getExternalBlobUrl } from './imageUtils';
-import TroubleshootingPanel from './TroubleshootingPanel';
-import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { ArrowLeft, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { createRandomSubset } from './randomSubset';
+import { AdaptiveScheduler } from './adaptiveScheduler';
+import { getQuestionsForBlock, getCombinedBlockLabel, getBlockCount } from './blockUtils';
+import PreGameQuestionCountView from './PreGameQuestionCountView';
+import PreQuizSummaryView from './PreQuizSummaryView';
+import type { Question } from '../backend';
+import type { WrongAnswerEntry } from './wrongAnswerTypes';
+import { useQuestionTranslation } from '../hooks/useQuestionTranslation';
+
+type QuizStep = 'blockSelection' | 'questionCount' | 'summary' | 'quiz';
 
 interface QuizGameplayProps {
-  quizId: QuizId;
-  onComplete: (correct: number, total: number) => void;
-  onBack: () => void;
-  isAdmin: boolean;
+  quizId: string;
+  onComplete: (correct: number, total: number, wrongAnswers: WrongAnswerEntry[]) => void;
+  onStepChange?: (isActiveQuiz: boolean) => void;
 }
 
-export default function QuizGameplay({ quizId, onComplete, onBack, isAdmin }: QuizGameplayProps) {
-  const { data: questionCountBigInt } = useGetQuestionCount(quizId);
-  const { data: blockNamesMap } = useGetAllBlockNames(quizId);
-  
+export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizGameplayProps) {
+  const { data: allQuestions = [], isLoading: questionsLoading } = useGetAllQuestions(quizId);
+  const { data: blockNamesData = [] } = useGetAllBlockNames(quizId);
+
+  const [currentStep, setCurrentStep] = useState<QuizStep>('blockSelection');
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null);
-  const [blockSelectionComplete, setBlockSelectionComplete] = useState(false);
-  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
-  
-  const { data: questions, isLoading: questionsLoading } = useGetQuestionChunk(
-    quizId,
-    selectedBlockIndex ?? 0,
-    blockSelectionComplete && selectedBlockIndex !== null
-  );
-  
-  const { getTranslation, getCachedTranslation, isTranslating, error: translationError, clearError } = useQuestionTranslation();
-  
+  const [selectedQuestionCount, setSelectedQuestionCount] = useState<number>(10);
+  const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [scheduler, setScheduler] = useState<AdaptiveScheduler | null>(null);
-  const [sessionState, setSessionState] = useState<SessionState | null>(null);
-  const [currentQuestionId, setCurrentQuestionId] = useState<number | null>(null);
+  const [currentQuestionId, setCurrentQuestionId] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
+
+  const { getTranslation, isTranslating, error: translationError } = useQuestionTranslation();
   const [translatedText, setTranslatedText] = useState<string | null>(null);
 
-  const totalQuestions = questionCountBigInt ? Number(questionCountBigInt) : 0;
-  const availableBlocks = getAvailableBlockIndices(totalQuestions);
+  const blockNamesMap = new Map(blockNamesData);
+  const totalBlocks = getBlockCount(allQuestions.length);
 
+  // Notify parent when step changes - only 'quiz' step is active quiz
   useEffect(() => {
-    if (questions && questions.length > 0 && blockSelectionComplete) {
-      const newScheduler = new AdaptiveScheduler(questions.length);
-      setScheduler(newScheduler);
-      
-      const performanceMap = new Map<number, QuestionPerformance>();
-      for (let i = 0; i < questions.length; i++) {
-        performanceMap.set(i, {
-          questionId: i,
-          attempts: 0,
-          correctCount: 0,
-          incorrectCount: 0,
-          lastResult: null,
-          everMissed: false,
-          correctAfterMissCount: 0,
-          lastShownAt: -1,
-        });
-      }
-      
-      setSessionState({
-        performance: performanceMap,
-        totalAnswered: 0,
-        totalCorrect: 0,
-        isComplete: false,
+    if (onStepChange) {
+      onStepChange(currentStep === 'quiz');
+    }
+  }, [currentStep, onStepChange]);
+
+  // Reset translation when question changes
+  useEffect(() => {
+    setTranslatedText(null);
+  }, [currentQuestionId]);
+
+  // Fetch translation when toggle is enabled
+  useEffect(() => {
+    if (showTranslation && !translatedText && sessionQuestions[currentQuestionId]) {
+      const currentQuestion = sessionQuestions[currentQuestionId];
+      getTranslation(currentQuestion.text).then(setTranslatedText);
+    }
+  }, [showTranslation, translatedText, currentQuestionId, sessionQuestions, getTranslation]);
+
+  const handleBlockSelect = (blockIndex: number) => {
+    setSelectedBlockIndex(blockIndex);
+    setCurrentStep('questionCount');
+  };
+
+  const handleQuestionCountSelect = (count: number) => {
+    setSelectedQuestionCount(count);
+    setCurrentStep('summary');
+  };
+
+  const handleBackToBlockSelection = () => {
+    setCurrentStep('blockSelection');
+    setSelectedBlockIndex(null);
+  };
+
+  const handleBackToQuestionCount = () => {
+    setCurrentStep('questionCount');
+  };
+
+  const handleStartQuiz = () => {
+    if (selectedBlockIndex === null) return;
+
+    const blockQuestions = getQuestionsForBlock(allQuestions, selectedBlockIndex);
+    const subsetIndices = createRandomSubset(blockQuestions.length, selectedQuestionCount);
+    const subset = subsetIndices.map(idx => blockQuestions[idx]);
+    const newScheduler = new AdaptiveScheduler(subset.length);
+
+    setSessionQuestions(subset);
+    setScheduler(newScheduler);
+    setCurrentQuestionId(0);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+    setCurrentStep('quiz');
+  };
+
+  const handleAnswerSelect = (answerIndex: number) => {
+    if (showFeedback) return;
+    setSelectedAnswer(answerIndex);
+  };
+
+  const handleSubmitAnswer = () => {
+    if (selectedAnswer === null || !scheduler) return;
+
+    const currentQuestion = sessionQuestions[currentQuestionId];
+    const correct = selectedAnswer === Number(currentQuestion.correctAnswer);
+    setIsCorrect(correct);
+    setShowFeedback(true);
+
+    scheduler.recordAnswer(currentQuestionId, correct);
+  };
+
+  const handleNextQuestion = () => {
+    if (!scheduler) return;
+
+    if (scheduler.isSessionComplete()) {
+      const wrongAnswersList: WrongAnswerEntry[] = [];
+      const performance = scheduler.getPerformance();
+      let correctCount = 0;
+
+      performance.forEach((perf, qId) => {
+        if (perf.incorrectCount > 0) {
+          wrongAnswersList.push({
+            questionNumber: qId + 1,
+            questionText: sessionQuestions[qId].text,
+          });
+        }
+        if (perf.correctCount > 0) {
+          correctCount++;
+        }
       });
-      setCurrentQuestionId(newScheduler.getNextQuestion(undefined));
+
+      onComplete(correctCount, sessionQuestions.length, wrongAnswersList);
+    } else {
+      const nextId = scheduler.getNextQuestion(currentQuestionId);
+      setCurrentQuestionId(nextId);
       setSelectedAnswer(null);
       setShowFeedback(false);
       setIsCorrect(false);
     }
-  }, [questions, blockSelectionComplete]);
-
-  // Show translation error as toast
-  useEffect(() => {
-    if (translationError) {
-      toast.error(translationError);
-      clearError();
-    }
-  }, [translationError, clearError]);
-
-  // Reset translation state when question changes
-  useEffect(() => {
-    setShowTranslation(false);
-    setTranslatedText(null);
-  }, [currentQuestionId]);
-
-  const handleBlockSelect = (blockIndex: number) => {
-    setSelectedBlockIndex(blockIndex);
-    setBlockSelectionComplete(true);
   };
 
-  // Block selection screen
-  if (!blockSelectionComplete) {
-    if (availableBlocks.length === 0) {
-      return (
-        <div className="max-w-2xl mx-auto">
-          {isAdmin && (
-            <Button variant="ghost" onClick={onBack} className="mb-3 sm:mb-4" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Editor
-            </Button>
-          )}
-          
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>No Questions Found</AlertTitle>
-            <AlertDescription className="space-y-2">
-              <p>
-                This quiz doesn't have any questions yet. This could happen for two reasons:
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>No questions have been uploaded to this quiz yet</li>
-                <li>You are signed in with a different Internet Identity than the person who uploaded the questions</li>
-              </ul>
-              <p className="text-sm">
-                Click the button below to view quiz data diagnostics and see all available quizzes.
-              </p>
-            </AlertDescription>
-          </Alert>
-
-          <TroubleshootingPanel 
-            currentQuizId={quizId} 
-            initialOpen={showTroubleshooting}
-            onOpenChange={setShowTroubleshooting}
-          />
-
-          {!showTroubleshooting && (
-            <Card className="mb-4">
-              <CardContent className="pt-6">
-                <Button 
-                  onClick={() => setShowTroubleshooting(true)} 
-                  className="w-full"
-                  variant="outline"
-                >
-                  View Quiz Data Diagnostics
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {isAdmin && (
-            <Card>
-              <CardContent className="pt-6">
-                <Button onClick={onBack} className="w-full" size="sm">
-                  Go to Editor to Add Questions
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      );
-    }
-
+  if (questionsLoading) {
     return (
-      <div className="max-w-2xl mx-auto">
-        {isAdmin && (
-          <Button variant="ghost" onClick={onBack} className="mb-3 sm:mb-4" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Editor
-          </Button>
-        )}
-        
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (allQuestions.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Alert>
+          <AlertDescription>
+            No questions available. Please contact an administrator to add questions.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // Block selection step
+  if (currentStep === 'blockSelection') {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Select Question Block</CardTitle>
-            <CardDescription className="text-sm">
-              Choose which 100-question block you want to practice. Each block contains up to 100 questions.
+            <CardTitle>Select Question Block</CardTitle>
+            <CardDescription>
+              Choose a block of 100 questions to practice
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 sm:space-y-3">
-            {availableBlocks.map((blockIdx) => {
-              const blockLabel = getCombinedBlockLabel(blockIdx, blockNamesMap?.get(blockIdx));
-              return (
-                <Button
-                  key={blockIdx}
-                  variant="outline"
-                  className="w-full justify-start text-left h-auto py-3 sm:py-4 px-3 sm:px-4"
-                  onClick={() => handleBlockSelect(blockIdx)}
-                >
-                  <div className="flex flex-col items-start gap-1">
-                    <span className="font-semibold text-sm sm:text-base">{blockLabel}</span>
-                    <span className="text-xs sm:text-sm text-muted-foreground">
-                      Practice questions in this block
-                    </span>
-                  </div>
-                </Button>
-              );
-            })}
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {Array.from({ length: totalBlocks }, (_, i) => {
+                const blockQuestions = getQuestionsForBlock(allQuestions, i);
+                const blockLabel = getCombinedBlockLabel(i, blockNamesMap.get(i));
+                return (
+                  <Button
+                    key={i}
+                    variant="outline"
+                    className="h-auto py-4 flex flex-col items-start"
+                    onClick={() => handleBlockSelect(i)}
+                  >
+                    <div className="font-semibold">{blockLabel}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {blockQuestions.length} questions
+                    </div>
+                  </Button>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  if (questionsLoading || !questions || !scheduler || !sessionState || currentQuestionId === null) {
+  // Question count selection step
+  if (currentStep === 'questionCount') {
+    const blockQuestions = selectedBlockIndex !== null
+      ? getQuestionsForBlock(allQuestions, selectedBlockIndex)
+      : [];
+
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-sm sm:text-base text-muted-foreground">Loading quiz...</p>
-        </div>
-      </div>
+      <PreGameQuestionCountView
+        maxQuestions={blockQuestions.length}
+        onStart={handleQuestionCountSelect}
+        onBack={handleBackToBlockSelection}
+        isLoading={false}
+      />
     );
   }
 
-  const currentQuestion = questions[currentQuestionId];
-  
-  // Calculate progress based on unique questions attempted (not total submissions)
-  const uniqueQuestionsAttempted = Array.from(sessionState.performance.values()).filter(
-    p => p.attempts > 0
-  ).length;
-  const progress = (uniqueQuestionsAttempted / questions.length) * 100;
+  // Summary step
+  if (currentStep === 'summary') {
+    const blockQuestions = selectedBlockIndex !== null
+      ? getQuestionsForBlock(allQuestions, selectedBlockIndex)
+      : [];
 
-  const handleAnswerSelect = (answerIndex: number) => {
-    if (!showFeedback) {
-      setSelectedAnswer(answerIndex);
-    }
-  };
+    return (
+      <PreQuizSummaryView
+        selectedBlockIndex={selectedBlockIndex}
+        selectedQuestionCount={selectedQuestionCount}
+        blockQuestions={blockQuestions}
+        blockNamesMap={blockNamesMap}
+        onStartQuiz={handleStartQuiz}
+        onBackToQuestionCount={handleBackToQuestionCount}
+        onBackToBlockSelection={handleBackToBlockSelection}
+      />
+    );
+  }
 
-  const handleSubmit = () => {
-    if (selectedAnswer === null) return;
-
-    const correct = selectedAnswer === Number(currentQuestion.correctAnswer);
-    setIsCorrect(correct);
-    setShowFeedback(true);
-
-    // Record answer in scheduler first (source of truth)
-    scheduler.recordAnswer(currentQuestionId, correct);
-
-    // Sync session state from scheduler
-    const updatedPerformance = scheduler.getPerformance();
-    const stats = scheduler.getStats();
-    
-    setSessionState({
-      performance: updatedPerformance,
-      totalAnswered: stats.totalAttempts,
-      totalCorrect: stats.totalCorrect,
-      isComplete: scheduler.isSessionComplete(),
-    });
-  };
-
-  const handleNext = () => {
-    // Check if session is complete via scheduler
-    if (scheduler.isSessionComplete()) {
-      onComplete(sessionState.totalCorrect, sessionState.totalAnswered);
-      return;
-    }
-
-    const nextId = scheduler.getNextQuestion(currentQuestionId);
-    setCurrentQuestionId(nextId);
-    setSelectedAnswer(null);
-    setShowFeedback(false);
-    setIsCorrect(false);
-  };
-
-  const handleTranslationPress = async () => {
-    // Only translate if there is text to translate
-    if (!currentQuestion.text || currentQuestion.text.trim().length === 0) {
-      return;
-    }
-
-    // Check if we already have a cached translation
-    const cached = getCachedTranslation(currentQuestion.text);
-    if (cached) {
-      setTranslatedText(cached);
-      setShowTranslation(true);
-      return;
-    }
-
-    // Fetch translation if not cached
-    const translation = await getTranslation(currentQuestion.text);
-    if (translation) {
-      setTranslatedText(translation);
-      setShowTranslation(true);
-    }
-  };
-
-  const handleTranslationRelease = () => {
-    setShowTranslation(false);
-  };
-
-  const hasQuestionText = currentQuestion.text && currentQuestion.text.trim().length > 0;
-  const displayedQuestionText = showTranslation && translatedText ? translatedText : currentQuestion.text;
-  const currentBlockLabel = getCombinedBlockLabel(
-    selectedBlockIndex ?? 0,
-    blockNamesMap?.get(selectedBlockIndex ?? 0)
-  );
-
-  // Get current question performance for feedback message
-  const currentQuestionPerf = sessionState.performance.get(currentQuestionId);
-  const needsMoreCorrect = currentQuestionPerf?.everMissed && currentQuestionPerf.correctAfterMissCount < 2;
-  const correctsRemaining = needsMoreCorrect ? 2 - (currentQuestionPerf?.correctAfterMissCount ?? 0) : 0;
+  // Active quiz step
+  const currentQuestion = sessionQuestions[currentQuestionId];
+  const performance = scheduler?.getPerformance().get(currentQuestionId);
+  const attemptNumber = performance ? performance.attempts + 1 : 1;
 
   return (
-    <div className="min-h-[100dvh] flex flex-col">
-      {/* Top-aligned scrollable content area */}
-      <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-2 sm:py-4 quiz-gameplay-scroll-container">
-        <div className="w-full max-w-2xl mx-auto">
-          {isAdmin && (
-            <Button variant="ghost" onClick={onBack} className="mb-2 sm:mb-3" size="sm">
-              <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-              <span className="text-xs sm:text-sm">Back to Editor</span>
+    <div className="quiz-gameplay-container">
+      <div className="quiz-gameplay-scroll-container">
+        <div className="max-w-3xl mx-auto px-4 pt-6 pb-2">
+          <div className="mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToBlockSelection}
+              className="mb-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Block Selection
             </Button>
-          )}
+            <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+              <span>
+                Question {currentQuestionId + 1} of {sessionQuestions.length}
+              </span>
+              {attemptNumber > 1 && (
+                <span className="text-xs">Attempt #{attemptNumber}</span>
+              )}
+            </div>
+          </div>
 
-          <Card className="quiz-mobile-scale">
-            <CardHeader className="p-2.5 sm:p-6 pb-1.5 sm:pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
-                <div className="flex-1 space-y-1.5 sm:space-y-3 min-w-0">
-                  {hasQuestionText && (
-                    <CardTitle className="text-sm sm:text-xl leading-snug break-words">{displayedQuestionText}</CardTitle>
-                  )}
-                  {currentQuestion.imageUrl && (
-                    <div className="w-full">
-                      <img
-                        src={getExternalBlobUrl(currentQuestion.imageUrl)}
-                        alt="Question"
-                        className="w-full max-h-40 sm:max-h-96 object-contain rounded-lg border"
-                      />
-                    </div>
-                  )}
-                </div>
-                {hasQuestionText && (
-                  <button
-                    onPointerDown={handleTranslationPress}
-                    onPointerUp={handleTranslationRelease}
-                    onPointerLeave={handleTranslationRelease}
-                    onPointerCancel={handleTranslationRelease}
-                    onMouseDown={handleTranslationPress}
-                    onMouseUp={handleTranslationRelease}
-                    onMouseLeave={handleTranslationRelease}
-                    onTouchStart={handleTranslationPress}
-                    onTouchEnd={handleTranslationRelease}
-                    onTouchCancel={handleTranslationRelease}
-                    disabled={isTranslating}
-                    className="flex items-center justify-center px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-md border-2 border-foreground/80 bg-background hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-none select-none shadow-sm shrink-0 h-9 sm:h-auto"
-                    title="Press and hold to translate to English"
-                    aria-label="Press and hold to translate to English"
+          <Card>
+            <CardHeader className="space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <CardTitle className="text-xl leading-relaxed flex-1">
+                  {currentQuestion.text}
+                </CardTitle>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Switch
+                    id="translation-toggle"
+                    checked={showTranslation}
+                    onCheckedChange={setShowTranslation}
+                  />
+                  <Label
+                    htmlFor="translation-toggle"
+                    className="text-sm cursor-pointer whitespace-nowrap flex items-center gap-1"
                   >
-                    {isTranslating ? (
-                      <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 animate-spin text-muted-foreground" />
-                    ) : (
-                      <span className="text-[0.65rem] sm:text-sm font-black uppercase tracking-wider text-foreground rotate-[-2deg] inline-block">
-                        Plan-B
-                      </span>
-                    )}
-                  </button>
-                )}
+                    <img
+                      src="/assets/generated/english-flag-icon.dim_24x24.png"
+                      alt="EN"
+                      className="w-5 h-5"
+                    />
+                  </Label>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-4 p-2.5 sm:p-6 pt-0">
-              <RadioGroup
-                value={selectedAnswer !== null ? String(selectedAnswer) : ""}
-                onValueChange={(value) => handleAnswerSelect(parseInt(value))}
-                disabled={showFeedback}
-              >
-                {currentQuestion.answers.map((answer, index) => {
-                  const isSelected = selectedAnswer === index;
-                  const isCorrectAnswer = index === Number(currentQuestion.correctAnswer);
-                  const showAsCorrect = showFeedback && isCorrectAnswer;
-                  const showAsWrong = showFeedback && isSelected && !isCorrect;
 
-                  return (
-                    <div
-                      key={index}
-                      className={`flex items-center space-x-2 sm:space-x-3 p-2.5 sm:p-4 rounded-lg border-2 transition-colors min-h-[44px] ${
-                        showAsCorrect
-                          ? 'border-success bg-success/10'
-                          : showAsWrong
-                          ? 'border-destructive bg-destructive/10'
-                          : isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
-                      }`}
-                    >
-                      <RadioGroupItem value={String(index)} id={`answer-${index}`} className="shrink-0" />
-                      <Label
-                        htmlFor={`answer-${index}`}
-                        className="flex-1 cursor-pointer font-normal text-xs sm:text-base leading-snug break-words"
-                      >
-                        {answer}
-                      </Label>
-                      {showAsCorrect && <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-success shrink-0" />}
-                      {showAsWrong && <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive shrink-0" />}
+              {showTranslation && (
+                <div className="pt-2 border-t">
+                  {isTranslating ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Translating...
                     </div>
-                  );
-                })}
-              </RadioGroup>
-
-              {showFeedback && (
-                <div
-                  className={`p-2.5 sm:p-4 rounded-lg ${
-                    isCorrect ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 sm:gap-2 font-medium text-xs sm:text-base">
-                    {isCorrect ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
-                        <span>
-                          {needsMoreCorrect 
-                            ? `Correct! Answer correctly ${correctsRemaining} more time${correctsRemaining > 1 ? 's' : ''} to master this question.`
-                            : 'Correct!'}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
-                        <span>Incorrect - You'll need to answer this correctly twice to master it</span>
-                      </>
-                    )}
-                  </div>
+                  ) : translationError ? (
+                    <div className="text-sm text-destructive">
+                      Translation unavailable
+                    </div>
+                  ) : translatedText ? (
+                    <div className="text-base text-muted-foreground italic">
+                      {translatedText}
+                    </div>
+                  ) : null}
                 </div>
               )}
+
+              {currentQuestion.imageUrl && (
+                <div className="mt-3">
+                  <img
+                    src={currentQuestion.imageUrl.getDirectURL()}
+                    alt="Question"
+                    className="max-w-full h-auto rounded-lg border"
+                  />
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {currentQuestion.answers.map((answer, index) => {
+                const isSelected = selectedAnswer === index;
+                const isCorrectAnswer = index === Number(currentQuestion.correctAnswer);
+                const showCorrect = showFeedback && isCorrectAnswer;
+                const showIncorrect = showFeedback && isSelected && !isCorrect;
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleAnswerSelect(index)}
+                    disabled={showFeedback}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      showCorrect
+                        ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                        : showIncorrect
+                        ? 'border-red-500 bg-red-50 dark:bg-red-950'
+                        : isSelected
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    } ${showFeedback ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="flex-1">{answer}</span>
+                      {showCorrect && <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />}
+                      {showIncorrect && <XCircle className="h-5 w-5 text-red-600 shrink-0" />}
+                    </div>
+                  </button>
+                );
+              })}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Sticky bottom action bar */}
-      <div className="quiz-gameplay-action-bar border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="w-full max-w-2xl mx-auto px-2 sm:px-4 py-2 sm:py-3">
+      <div className="quiz-gameplay-action-bar">
+        <div className="max-w-3xl mx-auto px-4">
           {!showFeedback ? (
-            <Button 
-              onClick={handleSubmit} 
-              disabled={selectedAnswer === null} 
-              className="w-full text-xs sm:text-sm h-10 sm:h-auto" 
-              size="sm"
+            <Button
+              onClick={handleSubmitAnswer}
+              disabled={selectedAnswer === null}
+              className="w-full"
+              size="lg"
             >
               Submit Answer
             </Button>
           ) : (
-            <Button 
-              onClick={handleNext} 
-              className="w-full text-xs sm:text-sm h-10 sm:h-auto" 
-              size="sm"
-            >
-              {scheduler.isSessionComplete() ? 'View Results' : 'Next Question'}
-            </Button>
+            <div className="space-y-2">
+              <Alert variant={isCorrect ? 'default' : 'destructive'} className="py-2">
+                <AlertDescription className="text-center font-medium">
+                  {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
+                </AlertDescription>
+              </Alert>
+              <Button onClick={handleNextQuestion} className="w-full" size="lg">
+                Next Question
+              </Button>
+            </div>
           )}
-        </div>
-      </div>
-
-      {/* Fixed bottom progress bar */}
-      <div className="border-t bg-card px-2 sm:px-4 py-2 sm:py-3 safe-area-inset-bottom">
-        <div className="w-full max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-1.5 sm:mb-2 text-[0.65rem] sm:text-sm text-muted-foreground">
-            <span className="font-medium">{currentBlockLabel}</span>
-            <span>
-              {uniqueQuestionsAttempted} / {questions.length} questions
-            </span>
-          </div>
-          <Progress value={progress} className="h-1.5 sm:h-2" />
-          <div className="flex items-center justify-between mt-1 sm:mt-1.5 text-[0.6rem] sm:text-xs text-muted-foreground">
-            <span>Score: {sessionState.totalCorrect} / {sessionState.totalAnswered}</span>
-            <span>
-              {sessionState.totalAnswered > 0
-                ? `${Math.round((sessionState.totalCorrect / sessionState.totalAnswered) * 100)}% correct`
-                : 'No answers yet'}
-            </span>
-          </div>
         </div>
       </div>
     </div>

@@ -9,12 +9,16 @@ export interface DiagnosticError {
   stack?: string;
   timestamp: string;
   context?: string;
-  type: 'error' | 'unhandledRejection' | 'actorInit' | 'runtime' | 'retry';
+  type: 'error' | 'unhandledRejection' | 'actorInit' | 'runtime' | 'retry' | 'forceRefresh';
   metadata?: {
     host?: string;
     canisterId?: string | null;
     network?: string;
+    canisterIdSource?: string;
+    canisterIdSourcesAttempted?: string[];
   };
+  detectedIssue?: 'canisterStopped';
+  detectedCanisterId?: string;
 }
 
 class DeploymentDiagnostics {
@@ -26,7 +30,13 @@ class DeploymentDiagnostics {
     this.loadFromStorage();
   }
 
-  captureError(error: Error | string, context?: string, type: DiagnosticError['type'] = 'error'): void {
+  captureError(
+    error: Error | string, 
+    context?: string, 
+    type: DiagnosticError['type'] = 'error',
+    detectedIssue?: 'canisterStopped',
+    detectedCanisterId?: string
+  ): void {
     const connectionInfo = getActorConnectionInfo();
     
     const diagnosticError: DiagnosticError = {
@@ -39,7 +49,11 @@ class DeploymentDiagnostics {
         host: connectionInfo.host,
         canisterId: connectionInfo.canisterId,
         network: connectionInfo.network,
+        canisterIdSource: connectionInfo.canisterIdSource,
+        canisterIdSourcesAttempted: connectionInfo.canisterIdSourcesAttempted,
       },
+      detectedIssue,
+      detectedCanisterId,
     };
 
     this.errors.unshift(diagnosticError);
@@ -57,6 +71,10 @@ class DeploymentDiagnostics {
 
   captureRetryAttempt(context?: string): void {
     this.captureError('Connection retry initiated', context, 'retry');
+  }
+
+  captureForceRefresh(context?: string): void {
+    this.captureError('Force refresh initiated', context, 'forceRefresh');
   }
 
   getErrors(): DiagnosticError[] {
@@ -102,38 +120,40 @@ BUILD INFORMATION:
 - Environment: ${buildInfo.environment}
 - Deployment ID: ${buildInfo.deploymentId}
 
-CONNECTION CONFIGURATION:
-- Agent Host: ${connectionInfo.host}
+CONNECTION INFORMATION:
+- Current Location: ${currentLocation}
 - Network: ${connectionInfo.network}
-- Backend Canister ID: ${connectionInfo.canisterId || '(not found)'}
+- Host: ${connectionInfo.host}
+- Backend Canister ID: ${connectionInfo.canisterId || '(not resolved)'}
+- Canister ID Source: ${connectionInfo.canisterIdSource}
+- Sources Attempted: ${connectionInfo.canisterIdSourcesAttempted.join(', ')}
+${connectionInfo.canisterIdResolutionError ? `- Resolution Error: ${connectionInfo.canisterIdResolutionError}` : ''}
 
-LOCATION:
-- Origin: ${window.location.origin}
-- Pathname: ${window.location.pathname}
-- Hash: ${window.location.hash || '(none)'}
-- Full URL: ${currentLocation}
-
-${'='.repeat(80)}
+ERROR LOG (${this.errors.length} entries):
+${this.errors.length === 0 ? '(No errors recorded)' : ''}
 `;
 
-    if (this.errors.length === 0) {
-      return header + '\nNo errors captured.\n';
-    }
+    const errorEntries = this.errors.map((error, index) => {
+      let entry = `
+[${index + 1}] ${error.type.toUpperCase()}
+Timestamp: ${error.timestamp}
+${error.context ? `Context: ${error.context}` : ''}
+${error.detectedIssue === 'canisterStopped' ? `⚠️  DETECTED ISSUE: Canister Stopped (IC0508)` : ''}
+${error.detectedCanisterId ? `Stopped Canister ID: ${error.detectedCanisterId}` : ''}
+Message: ${error.message}
+${error.stack ? `\nStack Trace:\n${error.stack}` : ''}
+${error.metadata ? `
+Connection Details:
+- Network: ${error.metadata.network}
+- Host: ${error.metadata.host}
+- Canister ID: ${error.metadata.canisterId || '(not resolved)'}
+- Source: ${error.metadata.canisterIdSource}
+` : ''}
+${'─'.repeat(80)}`;
+      return entry;
+    }).join('\n');
 
-    const errorLog = this.errors
-      .map((err, idx) => {
-        const metadataStr = err.metadata 
-          ? `\nConnection: ${err.metadata.network} (${err.metadata.host})\nCanister ID: ${err.metadata.canisterId || '(not found)'}`
-          : '';
-        return `
-Error #${idx + 1} [${err.type}] - ${err.timestamp}
-${err.context ? `Context: ${err.context}\n` : ''}Message: ${err.message}${metadataStr}
-${err.stack ? `Stack:\n${err.stack}\n` : ''}
-${'-'.repeat(80)}`;
-      })
-      .join('\n');
-
-    return header + '\nCAPTURED ERRORS:\n' + errorLog;
+    return header + errorEntries;
   }
 }
 

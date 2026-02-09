@@ -3,6 +3,35 @@
         <meta charset='UTF-8' />
         <meta name='viewport' content='width=device-width, initial-scale=1.0' />
         <title>TN intelligence Quiz</title>
+        <script>
+            // Pre-bootstrap script: Load runtime environment from /env.json
+            // This runs before the React app starts, ensuring window.__ENV__ is available
+            (function() {
+                // Cache-bust the env.json fetch to ensure fresh config on every load
+                var cacheBuster = 'cb=' + Date.now();
+                fetch('/env.json?' + cacheBuster, {
+                    cache: 'no-store'
+                })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            console.warn('[env.json] Not found or not accessible (status: ' + response.status + '). Using empty environment. For live deployments, ensure /env.json exists with CANISTER_ID_BACKEND.');
+                            window.__ENV__ = {};
+                            return null;
+                        }
+                        return response.json();
+                    })
+                    .then(function(env) {
+                        if (env) {
+                            window.__ENV__ = env;
+                            console.log('[env.json] Runtime environment loaded successfully:', Object.keys(env).join(', '));
+                        }
+                    })
+                    .catch(function(error) {
+                        console.warn('[env.json] Failed to load:', error.message, '- Using empty environment. For live deployments, ensure /env.json is accessible.');
+                        window.__ENV__ = {};
+                    });
+            })();
+        </script>
     </head>
     <body>
         <div id='root'></div>

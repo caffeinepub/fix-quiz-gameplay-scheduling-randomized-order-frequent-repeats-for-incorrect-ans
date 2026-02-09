@@ -2,35 +2,33 @@
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
   "summary": "New project",
-  "architectural_notes": [
-    "Admin question editor should preserve in-progress form state across tab/page navigation (avoid refresh/reset; consider draft persistence)."
-  ],
+  "architectural_notes": [],
   "known_issues": [
-    "Admin page: while adding/editing a question, switching to another browser page and returning refreshes the form and loses unsaved input; started after adding a .jpg to a question."
+    "Regression: newer versions after v56 are 'ruined' per user; need rollback to v56"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-prevent-the-quiz-editor-form-from-resetting-unsaved-local-question-edits-when-the-browser-tab-window-loses-focus-and-then-regains-focus-e-g-user-switches-to-another-page-tab-and-returns-by-ensuring-the-questions-query-does-not-refetch-on-window-focus-and-overwrite-in-progress-edits",
-      "title": "Prevent the Quiz Editor form from resetting unsaved local question edits when the browser tab/window loses focus and then regains focus (e.g., user switches to another page/tab and returns) by ensuring the questions query does not refetch on window focus and overwrite in-progress edits.",
+      "id": "feature-restore-the-application-s-ui-styling-and-layout-to-match-version-56-by-removing-undoing-the-styling-layout-changes-introduced-in-later-versions-notably-version-58-ensuring-a-consistent-neutral-shadcn-tailwind-look-across-the-app-shell-and-quiz-related-screens-including-pregamequestioncountview-prequizsummaryview-and-quizresults",
+      "title": "Restore the application’s UI styling and layout to match Version 56 by removing/undoing the styling/layout changes introduced in later versions (notably Version 58+), ensuring a consistent neutral Shadcn/Tailwind look across the app shell and quiz-related screens (including PreGameQuestionCountView, PreQuizSummaryView, and QuizResults).",
       "reqIds": [
-        "REQ-4"
+        "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-ensure-server-fetched-questions-do-not-overwrite-in-progress-local-edits-in-quizeditor-when-react-query-updates-refetches-the-questions-data-including-after-background-refetches-invalidations-or-image-attachment-flow-by-guarding-the-sync-localquestions-from-questions-effect-so-it-does-not-run-when-there-are-unsaved-changes",
-      "title": "Ensure server-fetched questions do not overwrite in-progress local edits in QuizEditor when React Query updates/refetches the questions data (including after background refetches, invalidations, or image attachment flow), by guarding the \"sync localQuestions from questions\" effect so it does not run when there are unsaved changes.",
+      "id": "feature-restore-version-56-header-navigation-behavior-so-that-the-play-and-edit-header-actions-are-visible-throughout-the-start-flow-and-non-game-views-and-are-hidden-only-while-the-user-is-actively-in-the-in-game-question-answering-screen-the-active-quiz-step",
+      "title": "Restore Version 56 header navigation behavior so that the “Play” and “Edit” header actions are visible throughout the start flow and non-game views, and are hidden only while the user is actively in the in-game question-answering screen (the active quiz step).",
       "reqIds": [
-        "REQ-5"
+        "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-add-draft-persistence-for-in-progress-question-edits-in-the-quiz-editor-so-that-accidental-reloads-or-navigations-do-not-lose-unsaved-input-persist-to-browser-storage-keyed-by-quizid-and-restore-automatically-when-returning-to-the-editor-with-clear-english-ui-text-to-resume-discard-the-draft-if-the-server-version-differs",
-      "title": "Add draft persistence for in-progress question edits in the Quiz Editor so that accidental reloads or navigations do not lose unsaved input; persist to browser storage keyed by quizId and restore automatically when returning to the editor, with clear English UI text to resume/discard the draft if the server version differs.",
+      "id": "feature-update-the-build-version-identity-shown-in-the-ui-to-report-version-56-e-g-the-footer-build-version-and-any-diagnostics-build-info-so-the-published-build-is-clearly-labeled-as-v56",
+      "title": "Update the build/version identity shown in the UI to report Version 56 (e.g., the footer build version and any diagnostics build info), so the published build is clearly labeled as v56.",
       "reqIds": [
-        "REQ-6"
+        "REQ-3"
       ],
       "version": 1
     }
@@ -38,12 +36,12 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix admin page question editor losing unsaved input when navigating away/returning (regression after adding .jpg image)",
+      "summary": "Rollback deployment/build to Version 56 due to newer versions being ruined",
       "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Prevent Quiz Editor from losing unsaved question edits when switching tabs (regression after adding JPG)",
+  "projectName": "Rollback app behavior to match Version 56 and label build as v56",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

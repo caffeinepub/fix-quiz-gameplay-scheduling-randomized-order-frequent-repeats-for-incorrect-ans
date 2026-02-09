@@ -1,40 +1,12 @@
+import { resolveBackendCanisterId, type CanisterIdResolution } from './canisterIdResolution';
+
 export interface ConnectionInfo {
   host: string;
   canisterId: string | null;
   network: string;
-}
-
-// Get canister ID from environment or env.json
-function getCanisterId(): string | null {
-  // Try environment variables first (set by build process)
-  if (typeof process !== 'undefined' && process.env) {
-    const envCanisterId = 
-      process.env.CANISTER_ID_BACKEND ||
-      process.env.BACKEND_CANISTER_ID;
-    if (envCanisterId) {
-      return envCanisterId;
-    }
-  }
-
-  // Try to load from env.json (deployed apps)
-  try {
-    // @ts-ignore - env.json is generated at build time
-    const envJson = window.__ENV__;
-    if (envJson?.CANISTER_ID_BACKEND) {
-      return envJson.CANISTER_ID_BACKEND;
-    }
-  } catch (e) {
-    // env.json not available
-  }
-
-  // Fallback: try to extract from current URL (for ic0.app/icp0.io domains)
-  const hostname = window.location.hostname;
-  const icDomainMatch = hostname.match(/^([a-z0-9-]+)\.(ic0\.app|icp0\.io|localhost)$/);
-  if (icDomainMatch) {
-    return icDomainMatch[1];
-  }
-
-  return null;
+  canisterIdSource: string;
+  canisterIdSourcesAttempted: string[];
+  canisterIdResolutionError?: string;
 }
 
 // Get agent host based on environment
@@ -50,7 +22,7 @@ function getAgentHost(): string {
 
 export function getActorConnectionInfo(): ConnectionInfo {
   const host = getAgentHost();
-  const canisterId = getCanisterId();
+  const resolution = resolveBackendCanisterId();
   
   // Determine network name from host
   let network = 'unknown';
@@ -62,7 +34,10 @@ export function getActorConnectionInfo(): ConnectionInfo {
 
   return {
     host,
-    canisterId,
+    canisterId: resolution.canisterId,
     network,
+    canisterIdSource: resolution.source,
+    canisterIdSourcesAttempted: resolution.sourcesAttempted,
+    canisterIdResolutionError: resolution.error,
   };
 }

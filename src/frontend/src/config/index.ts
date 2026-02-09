@@ -1,38 +1,6 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import type { backendInterface } from '../backend';
-
-// Get canister ID from environment or env.json
-function getCanisterId(): string {
-  // Try environment variables first (set by build process)
-  if (typeof process !== 'undefined' && process.env) {
-    const envCanisterId = 
-      process.env.CANISTER_ID_BACKEND ||
-      process.env.BACKEND_CANISTER_ID;
-    if (envCanisterId) {
-      return envCanisterId;
-    }
-  }
-
-  // Try to load from env.json (deployed apps)
-  try {
-    // @ts-ignore - env.json is generated at build time
-    const envJson = window.__ENV__;
-    if (envJson?.CANISTER_ID_BACKEND) {
-      return envJson.CANISTER_ID_BACKEND;
-    }
-  } catch (e) {
-    // env.json not available
-  }
-
-  // Fallback: try to extract from current URL (for ic0.app/icp0.io domains)
-  const hostname = window.location.hostname;
-  const icDomainMatch = hostname.match(/^([a-z0-9-]+)\.(ic0\.app|icp0\.io|localhost)$/);
-  if (icDomainMatch) {
-    return icDomainMatch[1];
-  }
-
-  throw new Error('Backend canister ID not found. Please ensure the canister is deployed and environment is configured correctly.');
-}
+import { getBackendCanisterIdOrThrow } from '../utils/canisterIdResolution';
 
 // Get agent host based on environment
 function getAgentHost(): string {
@@ -75,7 +43,8 @@ async function loadIdlFactory(): Promise<any> {
 }
 
 export async function createActorWithConfig(options?: ActorOptions): Promise<backendInterface> {
-  const canisterId = getCanisterId();
+  // Use the shared resolver which provides clear error messages
+  const canisterId = getBackendCanisterIdOrThrow();
   const host = options?.agentOptions?.host || getAgentHost();
   const idlFactory = await loadIdlFactory();
 
@@ -101,9 +70,12 @@ export async function createActorWithConfig(options?: ActorOptions): Promise<bac
   });
 }
 
+// Alias for convenience
+export const createActor = createActorWithConfig;
+
 export function getConnectionInfo(): { host: string; canisterId: string | null } {
   try {
-    const canisterId = getCanisterId();
+    const canisterId = getBackendCanisterIdOrThrow();
     const host = getAgentHost();
     return { host, canisterId };
   } catch (e) {

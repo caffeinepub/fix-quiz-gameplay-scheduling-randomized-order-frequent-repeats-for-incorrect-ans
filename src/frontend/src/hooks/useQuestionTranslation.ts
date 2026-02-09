@@ -1,76 +1,73 @@
-import { useState, useCallback } from 'react';
-import { translateText } from '../config/translation';
+import { useState, useCallback, useRef } from 'react';
+import { translateText, type TranslationRequest } from '../config/translation';
 
 interface TranslationCache {
-  [questionText: string]: string;
-}
-
-interface TranslationState {
-  isTranslating: boolean;
-  error: string | null;
+  [key: string]: string;
 }
 
 export function useQuestionTranslation() {
-  const [cache, setCache] = useState<TranslationCache>({});
-  const [state, setState] = useState<TranslationState>({
-    isTranslating: false,
-    error: null,
-  });
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const cacheRef = useRef<TranslationCache>({});
+  const activeRequestRef = useRef<string | null>(null);
 
-  const getTranslation = useCallback(
-    async (questionText: string): Promise<string | null> => {
-      // Return cached translation if available
-      if (cache[questionText]) {
-        return cache[questionText];
+  const getTranslation = useCallback(async (text: string): Promise<string | null> => {
+    if (!text.trim()) {
+      return null;
+    }
+
+    // Check cache first
+    if (cacheRef.current[text]) {
+      return cacheRef.current[text];
+    }
+
+    // If there's already a request for this text, wait for it
+    if (activeRequestRef.current === text) {
+      return null;
+    }
+
+    try {
+      setIsTranslating(true);
+      setError(null);
+      activeRequestRef.current = text;
+
+      const request: TranslationRequest = {
+        text,
+        sourceLang: 'de',
+        targetLang: 'en',
+      };
+
+      const translation = await translateText(request);
+      
+      // Cache the result
+      if (translation) {
+        cacheRef.current[text] = translation;
       }
 
-      // Prevent concurrent requests for the same question
-      if (state.isTranslating) {
-        return null;
-      }
+      return translation;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Translation failed';
+      setError(errorMessage);
+      return null;
+    } finally {
+      setIsTranslating(false);
+      activeRequestRef.current = null;
+    }
+  }, []);
 
-      setState({ isTranslating: true, error: null });
-
-      try {
-        const translatedText = await translateText({
-          text: questionText,
-          sourceLang: 'de',
-          targetLang: 'en',
-        });
-
-        // Cache the translation
-        setCache((prev) => ({
-          ...prev,
-          [questionText]: translatedText,
-        }));
-
-        setState({ isTranslating: false, error: null });
-        return translatedText;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Translation failed';
-        setState({ isTranslating: false, error: errorMessage });
-        return null;
-      }
-    },
-    [cache, state.isTranslating]
-  );
-
-  const getCachedTranslation = useCallback(
-    (questionText: string): string | null => {
-      return cache[questionText] || null;
-    },
-    [cache]
-  );
+  const getCachedTranslation = useCallback((text: string): string | null => {
+    return cacheRef.current[text] || null;
+  }, []);
 
   const clearError = useCallback(() => {
-    setState((prev) => ({ ...prev, error: null }));
+    setError(null);
   }, []);
 
   return {
     getTranslation,
     getCachedTranslation,
-    isTranslating: state.isTranslating,
-    error: state.error,
+    isTranslating,
+    error,
     clearError,
   };
 }

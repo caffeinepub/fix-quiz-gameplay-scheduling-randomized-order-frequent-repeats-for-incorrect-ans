@@ -1,7 +1,7 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-08T10:09:10.285Z",
+  "generatedAt": "2026-02-09T18:21:56.176Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
@@ -11,40 +11,48 @@
     "implemented": 3,
     "items": [
       {
-        "id": "REQ-4",
-        "summary": "Prevent the Quiz Editor form from resetting unsaved local question edits when the browser tab/window loses focus and then regains focus (e.g., user switches to another page/tab and returns) by ensuring the questions query does not refetch on window focus and overwrite in-progress edits.",
+        "id": "REQ-1",
+        "summary": "Restore the application’s UI styling and layout to match Version 56 by removing/undoing the styling/layout changes introduced in later versions (notably Version 58+), ensuring a consistent neutral Shadcn/Tailwind look across the app shell and quiz-related screens (including PreGameQuestionCountView, PreQuizSummaryView, and QuizResults).",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/App.tsx",
+          "frontend/src/quiz/PreGameQuestionCountView.tsx",
+          "frontend/src/quiz/PreQuizSummaryView.tsx",
+          "frontend/src/quiz/QuizResults.tsx",
+          "frontend/src/quiz/QuizGameplay.tsx",
+          "frontend/index.css"
         ],
         "matchedFiles": [
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/App.tsx",
+          "frontend/src/quiz/QuizGameplay.tsx"
         ]
       },
       {
-        "id": "REQ-5",
-        "summary": "Ensure server-fetched questions do not overwrite in-progress local edits in QuizEditor when React Query updates/refetches the questions data (including after background refetches, invalidations, or image attachment flow), by guarding the \"sync localQuestions from questions\" effect so it does not run when there are unsaved changes.",
+        "id": "REQ-2",
+        "summary": "Restore Version 56 header navigation behavior so that the “Play” and “Edit” header actions are visible throughout the start flow and non-game views, and are hidden only while the user is actively in the in-game question-answering screen (the active quiz step).",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/quiz/QuizEditor.tsx"
+          "frontend/src/App.tsx",
+          "frontend/src/quiz/QuizGameplay.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/quiz/QuizEditor.tsx"
+          "frontend/src/App.tsx",
+          "frontend/src/quiz/QuizGameplay.tsx"
         ]
       },
       {
-        "id": "REQ-6",
-        "summary": "Add draft persistence for in-progress question edits in the Quiz Editor so that accidental reloads or navigations do not lose unsaved input; persist to browser storage keyed by quizId and restore automatically when returning to the editor, with clear English UI text to resume/discard the draft if the server version differs.",
+        "id": "REQ-3",
+        "summary": "Update the build/version identity shown in the UI to report Version 56 (e.g., the footer build version and any diagnostics build info), so the published build is clearly labeled as v56.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/quiz/draftStorage.ts",
-          "frontend/src/quiz/QuizEditor.tsx",
-          "frontend/src/quiz/QuestionImagePicker.tsx"
+          "frontend/src/utils/buildStamp.ts",
+          "frontend/src/components/BuildIdentityFooter.tsx",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/quiz/draftStorage.ts",
-          "frontend/src/quiz/QuizEditor.tsx",
-          "frontend/src/quiz/QuestionImagePicker.tsx"
+          "frontend/src/utils/buildStamp.ts",
+          "frontend/src/components/BuildIdentityFooter.tsx",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx"
         ]
       }
     ]
@@ -54,10 +62,11 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/hooks/useQueries.ts",
-    "frontend/src/quiz/QuestionImagePicker.tsx",
-    "frontend/src/quiz/QuizEditor.tsx",
-    "frontend/src/quiz/draftStorage.ts",
+    "frontend/src/App.tsx",
+    "frontend/src/components/BuildIdentityFooter.tsx",
+    "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+    "frontend/src/quiz/QuizGameplay.tsx",
+    "frontend/src/utils/buildStamp.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useInternetIdentity } from './hooks/useInternetIdentity';
-import { useGetCallerUserProfile } from './hooks/useQueries';
+import { useGetCallerUserProfile, useIsAdmin } from './hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import LoginButton from './components/LoginButton';
 import ProfileSetup from './components/ProfileSetup';
 import QuizEditor from './quiz/QuizEditor';
 import QuizGameplay from './quiz/QuizGameplay';
 import QuizResults from './quiz/QuizResults';
+import WrongAnswersReview from './quiz/WrongAnswersReview';
 import DeploymentDiagnosticsPanel from './components/DeploymentDiagnosticsPanel';
-import { BookOpen, Edit, Play, Bug, AlertTriangle, RefreshCw } from 'lucide-react';
+import BuildIdentityFooter from './components/BuildIdentityFooter';
+import { BookOpen, Edit, Play, Bug, AlertTriangle, RefreshCw, Power, Rocket } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
@@ -16,8 +18,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './com
 import { diagnostics } from './utils/deploymentDiagnostics';
 import { getBuildInfo } from './utils/buildStamp';
 import { getActorConnectionInfo } from './utils/actorConnectionInfo';
+import { refreshToLatestBuild } from './utils/refreshToLatestBuild';
+import { detectStoppedCanister, formatStoppedCanisterMessage, getStoppedCanisterRecoverySteps } from './utils/stoppedCanisterDetection';
+import type { WrongAnswerEntry } from './quiz/wrongAnswerTypes';
 
-type View = 'editor' | 'gameplay' | 'results';
+type View = 'editor' | 'gameplay' | 'results' | 'wrongAnswersReview';
 
 const ACTIVE_QUIZ_ID = 'TN intelligence Quiz';
 
@@ -32,10 +37,15 @@ export default function App() {
     isFetched,
   } = useGetCallerUserProfile();
 
+  const { data: isAdmin = false } = useIsAdmin();
+
   const [currentView, setCurrentView] = useState<View>('gameplay');
   const [sessionScore, setSessionScore] = useState({ correct: 0, total: 0 });
+  const [wrongAnswers, setWrongAnswers] = useState<WrongAnswerEntry[]>([]);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [focusPublishSection, setFocusPublishSection] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isInActiveQuiz, setIsInActiveQuiz] = useState(false);
 
   // Check for debug flag in URL
   useEffect(() => {
@@ -50,14 +60,21 @@ export default function App() {
   const actorError = actorQuery?.error as Error | undefined;
   const actorFailed = actorQuery?.status === 'error';
 
+  // Detect stopped-canister error
+  const stoppedCanisterInfo = actorError ? detectStoppedCanister(actorError) : { isStopped: false, canisterId: null, originalError: '' };
+
   // Capture actor initialization failures for diagnostics
   useEffect(() => {
     if (actorFailed && actorError) {
       const buildInfo = getBuildInfo();
+      const stoppedInfo = detectStoppedCanister(actorError);
+      
       diagnostics.captureError(
         actorError,
         `Actor initialization failed at ${new Date().toISOString()} | Build: ${buildInfo.version} (${buildInfo.deploymentId}) | Environment: ${buildInfo.environment}`,
-        'actorInit'
+        'actorInit',
+        stoppedInfo.isStopped ? 'canisterStopped' : undefined,
+        stoppedInfo.canisterId || undefined
       );
     }
   }, [actorFailed, actorError]);
@@ -70,106 +87,258 @@ export default function App() {
 
   const handleStartQuiz = () => {
     setSessionScore({ correct: 0, total: 0 });
+    setWrongAnswers([]);
     setCurrentView('gameplay');
+    setIsInActiveQuiz(false);
   };
 
-  const handleQuizComplete = (correct: number, total: number) => {
+  const handleQuizComplete = (correct: number, total: number, wrongAnswersList: WrongAnswerEntry[]) => {
     setSessionScore({ correct, total });
+    setWrongAnswers(wrongAnswersList);
     setCurrentView('results');
+    setIsInActiveQuiz(false);
   };
 
   const handleBackToEditor = () => {
     setCurrentView('editor');
+    setIsInActiveQuiz(false);
   };
 
   const handlePlayAgain = () => {
     setSessionScore({ correct: 0, total: 0 });
+    setWrongAnswers([]);
     setCurrentView('gameplay');
+    setIsInActiveQuiz(false);
+  };
+
+  const handleReviewWrongAnswers = () => {
+    setCurrentView('wrongAnswersReview');
+    setIsInActiveQuiz(false);
+  };
+
+  const handleBackToResults = () => {
+    setCurrentView('results');
+    setIsInActiveQuiz(false);
   };
 
   const handleRetryConnection = async () => {
     setIsRetrying(true);
+    diagnostics.captureRetryAttempt('User-initiated retry from actor failure screen');
     
-    // Capture retry attempt in diagnostics
-    diagnostics.captureRetryAttempt(`User-initiated retry at ${new Date().toISOString()}`);
+    // Invalidate actor query to trigger re-initialization
+    await queryClient.invalidateQueries({ queryKey: ['actor'] });
     
-    // Clear the actor query cache to force re-initialization
-    const actorQueryKey = ['actor', identity?.getPrincipal().toString()];
-    queryClient.removeQueries({ queryKey: actorQueryKey });
-    
-    // Wait a moment for the query to be removed
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Invalidate to trigger refetch
-    await queryClient.invalidateQueries({ queryKey: actorQueryKey });
-    
-    setIsRetrying(false);
+    // Wait a moment for the query to settle
+    setTimeout(() => {
+      setIsRetrying(false);
+    }, 2000);
   };
 
-  // Render actor initialization error banner
-  if (actorFailed) {
-    const buildInfo = getBuildInfo();
-    const connectionInfo = getActorConnectionInfo();
-    
+  const handleForceRefresh = () => {
+    diagnostics.captureForceRefresh('User-initiated force refresh from actor failure screen');
+    refreshToLatestBuild();
+  };
+
+  const handleOpenPublishHelp = () => {
+    setFocusPublishSection(true);
+    setShowDiagnostics(true);
+  };
+
+  const handleCloseDiagnostics = () => {
+    setShowDiagnostics(false);
+    setFocusPublishSection(false);
+  };
+
+  const handleQuizStepChange = (isActiveQuiz: boolean) => {
+    setIsInActiveQuiz(isActiveQuiz);
+  };
+
+  // Unauthenticated view
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <header className="border-b bg-card">
-          <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
-              <h1 className="text-base sm:text-xl font-bold truncate">TN intelligence Quiz</h1>
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="w-full border-b bg-card">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <BookOpen className="h-8 w-8 text-primary" />
+              <h1 className="text-2xl font-bold text-foreground">
+                TN intelligence Quiz
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleOpenPublishHelp}
+                className="text-muted-foreground"
+                title="Publish help"
+              >
+                <Rocket className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDiagnostics(true)}
+                className="text-muted-foreground"
+                title="Diagnostics"
+              >
+                <Bug className="h-4 w-4" />
+              </Button>
+              <LoginButton />
             </div>
           </div>
         </header>
+
+        <main className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Welcome to TN intelligence Quiz</CardTitle>
+              <CardDescription className="text-center">
+                Please log in to access the quiz platform
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <LoginButton />
+            </CardContent>
+          </Card>
+        </main>
+
+        <BuildIdentityFooter />
+
+        {showDiagnostics && (
+          <DeploymentDiagnosticsPanel 
+            onClose={handleCloseDiagnostics}
+            focusPublishSection={focusPublishSection}
+          />
+        )}
+        <Toaster />
+      </div>
+    );
+  }
+
+  // Actor initialization failed - show error screen with enhanced diagnostics
+  if (actorFailed) {
+    const connectionInfo = getActorConnectionInfo();
+    const isLocalNetwork = connectionInfo.network === 'local' || connectionInfo.host.includes('localhost') || connectionInfo.host.includes('127.0.0.1');
+    
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="w-full border-b bg-card">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <BookOpen className="h-8 w-8 text-primary" />
+              <h1 className="text-2xl font-bold text-foreground">
+                TN intelligence Quiz
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleOpenPublishHelp}
+                className="text-muted-foreground"
+                title="Publish help"
+              >
+                <Rocket className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDiagnostics(true)}
+                className="text-muted-foreground"
+                title="Diagnostics"
+              >
+                <Bug className="h-4 w-4" />
+              </Button>
+              <LoginButton />
+            </div>
+          </div>
+        </header>
+
         <main className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-2xl border-destructive">
             <CardHeader>
-              <div className="flex items-start gap-3">
-                <div className="rounded-full bg-destructive/10 p-2 shrink-0">
-                  <AlertTriangle className="h-6 w-6 text-destructive" />
-                </div>
-                <div className="flex-1">
-                  <CardTitle className="text-destructive">Canister Connection Failed</CardTitle>
-                  <CardDescription className="mt-2">
-                    The application cannot connect to the backend canister on the Internet Computer network.
-                  </CardDescription>
-                </div>
-              </div>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                {stoppedCanisterInfo.isStopped ? (
+                  <>
+                    <Power className="h-6 w-6" />
+                    Backend Canister Stopped
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-6 w-6" />
+                    Connection Error
+                  </>
+                )}
+              </CardTitle>
+              <CardDescription>
+                {stoppedCanisterInfo.isStopped 
+                  ? formatStoppedCanisterMessage(stoppedCanisterInfo)
+                  : 'Unable to connect to the backend canister'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>What happened?</AlertTitle>
-                <AlertDescription className="mt-2 space-y-2">
-                  <p>
-                    The gateway could not resolve the canister ID for this application. This typically means:
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>The canister was not successfully deployed to the network</li>
-                    <li>The domain mapping is not yet propagated</li>
-                    <li>There is a network connectivity issue</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
+              {stoppedCanisterInfo.isStopped ? (
+                <>
+                  <Alert variant="destructive">
+                    <Power className="h-4 w-4" />
+                    <AlertTitle>Canister is Not Running</AlertTitle>
+                    <AlertDescription className="mt-2 space-y-3">
+                      <div className="text-sm">
+                        The backend canister must be started before the application can function.
+                        {stoppedCanisterInfo.canisterId && (
+                          <div className="mt-2 font-mono text-xs bg-destructive/10 p-2 rounded">
+                            Canister ID: {stoppedCanisterInfo.canisterId}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="text-sm">
+                        <div className="font-semibold mb-2">To start the canister:</div>
+                        <ol className="list-decimal list-inside space-y-1 text-xs ml-2">
+                          {getStoppedCanisterRecoverySteps(isLocalNetwork).map((step, idx) => (
+                            <li key={idx}>{step}</li>
+                          ))}
+                        </ol>
+                      </div>
 
-              <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
-                <div className="font-semibold text-foreground">Technical Details:</div>
-                <div className="space-y-1 text-muted-foreground font-mono text-xs">
-                  <div><span className="text-foreground">Error:</span> {actorError?.message || 'Unknown error'}</div>
-                  <div><span className="text-foreground">Time:</span> {new Date().toLocaleString()}</div>
-                  <div><span className="text-foreground">Network:</span> {connectionInfo.network}</div>
-                  <div><span className="text-foreground">Agent Host:</span> {connectionInfo.host}</div>
-                  <div><span className="text-foreground">Backend Canister ID:</span> {connectionInfo.canisterId || '(not found)'}</div>
-                  <div><span className="text-foreground">Build:</span> {buildInfo.version}</div>
-                  <div><span className="text-foreground">Deployment ID:</span> {buildInfo.deploymentId}</div>
-                  <div><span className="text-foreground">Environment:</span> {buildInfo.environment}</div>
-                </div>
-              </div>
+                      <div className="text-xs pt-2 border-t border-destructive/20">
+                        <div><strong>Network:</strong> {connectionInfo.network}</div>
+                        <div><strong>Host:</strong> {connectionInfo.host}</div>
+                        <div><strong>Canister ID:</strong> {connectionInfo.canisterId || '(not found)'}</div>
+                        <div><strong>Source:</strong> {connectionInfo.canisterIdSource}</div>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                </>
+              ) : (
+                <Alert variant="destructive">
+                  <AlertTitle>Error Details</AlertTitle>
+                  <AlertDescription className="mt-2 space-y-2">
+                    <div className="font-mono text-sm break-all">
+                      {actorError?.message || 'Unknown error occurred'}
+                    </div>
+                    <div className="text-xs space-y-1 mt-3 pt-3 border-t border-destructive/20">
+                      <div><strong>Network:</strong> {connectionInfo.network}</div>
+                      <div><strong>Host:</strong> {connectionInfo.host}</div>
+                      <div><strong>Canister ID:</strong> {connectionInfo.canisterId || '(not found)'}</div>
+                      <div><strong>Source:</strong> {connectionInfo.canisterIdSource}</div>
+                      <div><strong>Sources Attempted:</strong> {connectionInfo.canisterIdSourcesAttempted.join(', ')}</div>
+                      {connectionInfo.canisterIdResolutionError && (
+                        <div className="text-destructive font-semibold mt-2">
+                          <strong>Resolution Error:</strong> {connectionInfo.canisterIdResolutionError}
+                        </div>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
 
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   onClick={handleRetryConnection}
                   disabled={isRetrying}
+                  variant="outline"
                   className="flex-1"
                 >
                   {isRetrying ? (
@@ -178,97 +347,118 @@ export default function App() {
                       Retrying...
                     </>
                   ) : (
-                    'Retry Connection'
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Retry Connection
+                    </>
                   )}
                 </Button>
                 <Button
-                  variant="outline"
-                  onClick={() => setShowDiagnostics(true)}
+                  onClick={handleForceRefresh}
+                  variant="default"
                   className="flex-1"
                 >
-                  <Bug className="h-4 w-4 mr-2" />
-                  View Diagnostics
+                  <Power className="h-4 w-4 mr-2" />
+                  Force Refresh
                 </Button>
               </div>
 
-              <div className="text-xs text-muted-foreground text-center pt-2">
-                If this error persists, the deployment may need to be restarted with a fresh canister ID.
-              </div>
+              <Button
+                onClick={() => setShowDiagnostics(true)}
+                variant="outline"
+                className="w-full"
+              >
+                <Bug className="h-4 w-4 mr-2" />
+                View Full Diagnostics
+              </Button>
             </CardContent>
           </Card>
         </main>
-        <footer className="border-t py-4 sm:py-6 text-center text-xs sm:text-sm text-muted-foreground px-4">
-          © 2026. Built with ❤️ using{' '}
-          <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-            caffeine.ai
-          </a>
-        </footer>
+
+        <BuildIdentityFooter />
+
+        {showDiagnostics && (
+          <DeploymentDiagnosticsPanel 
+            onClose={handleCloseDiagnostics}
+            focusPublishSection={focusPublishSection}
+          />
+        )}
         <Toaster />
-        {showDiagnostics && <DeploymentDiagnosticsPanel onClose={() => setShowDiagnostics(false)} />}
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <header className="border-b bg-card">
-          <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
-              <h1 className="text-base sm:text-xl font-bold truncate">TN intelligence Quiz</h1>
-            </div>
-            <LoginButton />
-          </div>
-        </header>
-        <main className="flex-1 flex items-center justify-center p-4">
-          <div className="text-center max-w-md w-full">
-            <div className="mb-6 inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary/10">
-              <BookOpen className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4">Welcome to TN intelligence Quiz</h2>
-            <p className="text-sm sm:text-base text-muted-foreground mb-8">
-              Questions you get wrong will appear more often to help you learn.
-            </p>
-            <LoginButton />
-          </div>
-        </main>
-        <footer className="border-t py-4 sm:py-6 text-center text-xs sm:text-sm text-muted-foreground px-4">
-          © 2026. Built with ❤️ using{' '}
-          <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-            caffeine.ai
-          </a>
-        </footer>
-        <Toaster />
-        {showDiagnostics && <DeploymentDiagnosticsPanel onClose={() => setShowDiagnostics(false)} />}
-      </div>
-    );
-  }
-
-  if (showProfileSetup) {
-    return <ProfileSetup onComplete={handleProfileComplete} />;
-  }
-
+  // Authenticated view
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
-            <h1 className="text-base sm:text-xl font-bold truncate">TN intelligence Quiz</h1>
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="w-full border-b bg-card sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <BookOpen className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">
+              TN intelligence Quiz
+            </h1>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            {userProfile && (
-              <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline truncate max-w-[120px]">
-                Welcome, {userProfile.name}
-              </span>
+          <div className="flex items-center gap-2">
+            {!isInActiveQuiz && (
+              <>
+                <Button
+                  variant={currentView === 'gameplay' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={handleStartQuiz}
+                  className="hidden sm:flex"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Play
+                </Button>
+                <Button
+                  variant={currentView === 'gameplay' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={handleStartQuiz}
+                  className="sm:hidden"
+                  title="Play"
+                >
+                  <Play className="h-4 w-4" />
+                </Button>
+                {isAdmin && (
+                  <>
+                    <Button
+                      variant={currentView === 'editor' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={handleBackToEditor}
+                      className="hidden sm:flex"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant={currentView === 'editor' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={handleBackToEditor}
+                      className="sm:hidden"
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </>
             )}
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
+              onClick={handleOpenPublishHelp}
+              className="text-muted-foreground"
+              title="Publish help"
+            >
+              <Rocket className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setShowDiagnostics(true)}
-              className="h-8 w-8"
-              title="Open diagnostics"
+              className="text-muted-foreground"
+              title="Diagnostics"
             >
               <Bug className="h-4 w-4" />
             </Button>
@@ -277,60 +467,47 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="border-b bg-card/50 sticky top-[57px] sm:top-[65px] z-10">
-        <div className="container mx-auto px-3 sm:px-4">
-          <div className="flex gap-1 items-center">
-            <Button
-              variant={currentView === 'editor' ? 'default' : 'ghost'}
-              onClick={() => setCurrentView('editor')}
-              className="rounded-b-none flex-1 sm:flex-none text-sm sm:text-base h-10 sm:h-auto"
-              size="sm"
-            >
-              <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Admin</span>
-            </Button>
-            <Button
-              variant={currentView === 'gameplay' ? 'default' : 'ghost'}
-              onClick={handleStartQuiz}
-              className="rounded-b-none flex-1 sm:flex-none text-sm sm:text-base h-10 sm:h-auto"
-              size="sm"
-            >
-              <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Play Quiz</span>
-            </Button>
-          </div>
-        </div>
-      </nav>
-
-      <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        {currentView === 'editor' && <QuizEditor quizId={ACTIVE_QUIZ_ID} onStartQuiz={handleStartQuiz} />}
+      <main className="flex-1">
+        {currentView === 'editor' && isAdmin && (
+          <QuizEditor quizId={ACTIVE_QUIZ_ID} onStartQuiz={handleStartQuiz} />
+        )}
         {currentView === 'gameplay' && (
           <QuizGameplay 
             quizId={ACTIVE_QUIZ_ID} 
-            onComplete={handleQuizComplete} 
-            onBack={handleBackToEditor}
-            isAdmin={true}
+            onComplete={handleQuizComplete}
+            onStepChange={handleQuizStepChange}
           />
         )}
         {currentView === 'results' && (
           <QuizResults
             score={sessionScore}
+            wrongAnswers={wrongAnswers}
             onPlayAgain={handlePlayAgain}
-            onBackToEditor={handleBackToEditor}
-            isAdmin={true}
+            onReviewWrongAnswers={handleReviewWrongAnswers}
+            onBackToEditor={isAdmin ? handleBackToEditor : undefined}
+          />
+        )}
+        {currentView === 'wrongAnswersReview' && (
+          <WrongAnswersReview
+            wrongAnswers={wrongAnswers}
+            onBack={handleBackToResults}
           />
         )}
       </main>
 
-      <footer className="border-t py-4 sm:py-6 text-center text-xs sm:text-sm text-muted-foreground px-4">
-        © 2026. Built with ❤️ using{' '}
-        <a href="https://caffeine.ai" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-          caffeine.ai
-        </a>
-      </footer>
-      
+      <BuildIdentityFooter />
+
+      {showProfileSetup && (
+        <ProfileSetup onComplete={handleProfileComplete} />
+      )}
+
+      {showDiagnostics && (
+        <DeploymentDiagnosticsPanel 
+          onClose={handleCloseDiagnostics}
+          focusPublishSection={focusPublishSection}
+        />
+      )}
       <Toaster />
-      {showDiagnostics && <DeploymentDiagnosticsPanel onClose={() => setShowDiagnostics(false)} />}
     </div>
   );
 }

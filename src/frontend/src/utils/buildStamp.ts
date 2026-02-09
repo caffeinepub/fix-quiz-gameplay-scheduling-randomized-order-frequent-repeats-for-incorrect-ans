@@ -8,38 +8,54 @@ export interface BuildStamp {
   deploymentId: string;
 }
 
-// Stable deployment ID for the session
+// Stable deployment ID cached for the session
 let cachedDeploymentId: string | null = null;
 
+/**
+ * Get a stable deployment ID for this session.
+ * Prefers build-time injected VITE_DEPLOYMENT_ID when available,
+ * otherwise generates a session-stable ID.
+ */
 function getStableDeploymentId(): string {
   if (!cachedDeploymentId) {
-    cachedDeploymentId = `deploy-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    // Try build-time injected deployment ID first
+    const buildTimeId = import.meta.env.VITE_DEPLOYMENT_ID;
+    if (buildTimeId && typeof buildTimeId === 'string' && buildTimeId.trim()) {
+      cachedDeploymentId = buildTimeId.trim();
+    } else {
+      // Fallback: generate session-stable ID
+      cachedDeploymentId = `deploy-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    }
   }
   return cachedDeploymentId;
 }
 
-function getBuildStamp(): BuildStamp {
+/**
+ * Get build information for this deployment.
+ * Prefers build-time injected environment variables when available,
+ * otherwise generates session-stable fallbacks.
+ */
+export function getBuildInfo(): BuildStamp {
+  // Try build-time injected timestamp first
+  const buildTimeTimestamp = import.meta.env.VITE_BUILD_TIMESTAMP;
+  const timestamp = buildTimeTimestamp && typeof buildTimeTimestamp === 'string' && buildTimeTimestamp.trim()
+    ? buildTimeTimestamp.trim()
+    : new Date().toISOString();
+
+  // Try build-time injected version first - FIXED TO v56
+  const buildTimeVersion = import.meta.env.VITE_APP_VERSION;
+  const version = buildTimeVersion && typeof buildTimeVersion === 'string' && buildTimeVersion.trim()
+    ? buildTimeVersion.trim()
+    : '56';
+
+  // Determine environment
+  const mode = import.meta.env.MODE || 'production';
+  const environment = mode === 'development' ? 'development' : 'production';
+
   return {
-    timestamp: import.meta.env.VITE_BUILD_TIMESTAMP || new Date().toISOString(),
-    version: import.meta.env.VITE_APP_VERSION || '1.0.2',
-    environment: import.meta.env.MODE || 'development',
+    timestamp,
+    version,
+    environment,
     deploymentId: getStableDeploymentId(),
   };
-}
-
-export function logBuildStamp(): void {
-  const stamp = getBuildStamp();
-  console.log(
-    '%c🚀 Build Info - Fresh Deployment',
-    'background: #4CAF50; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;',
-    stamp
-  );
-  console.log(`Build Timestamp: ${stamp.timestamp}`);
-  console.log(`Version: ${stamp.version}`);
-  console.log(`Environment: ${stamp.environment}`);
-  console.log(`Deployment ID: ${stamp.deploymentId}`);
-}
-
-export function getBuildInfo(): BuildStamp {
-  return getBuildStamp();
 }
