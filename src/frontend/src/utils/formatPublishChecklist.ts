@@ -51,12 +51,12 @@ export function formatPublishChecklist(input: PublishChecklistInput): string {
   lines.push('');
   lines.push('2. Prepare Runtime Configuration (CRITICAL):');
   lines.push('   • Your live deployment must include a file named /env.json in the frontend assets');
-  lines.push('   • The file must contain:');
+  lines.push('   • The file must contain a NON-EMPTY CANISTER_ID_BACKEND value:');
   lines.push('     {');
   lines.push('       "CANISTER_ID_BACKEND": "your-live-backend-canister-id"');
   lines.push('     }');
   lines.push('   • This configuration is loaded into window.__ENV__ at runtime');
-  lines.push('   • Without this file, the frontend cannot connect to the backend');
+  lines.push('   • Without a non-empty value, the frontend cannot connect to the backend');
   lines.push('');
   lines.push('3. Publish via Caffeine Editor:');
   lines.push('   • Open your project in the Caffeine editor');

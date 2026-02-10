@@ -17,6 +17,7 @@ export default {
         extend: {
             fontFamily: {
                 sans: [
+                    'Rajdhani',
                     'Inter',
                     'system-ui',
                     '-apple-system',
@@ -89,7 +90,8 @@ export default {
             },
             boxShadow: {
                 xs: '0 1px 2px 0 rgba(0,0,0,0.05)',
-                soft: '0 2px 8px -2px rgba(0,0,0,0.1)'
+                soft: '0 2px 8px -2px rgba(0,0,0,0.1)',
+                cyber: '0 0 20px -5px oklch(var(--primary) / 0.3)'
             },
             keyframes: {
                 'accordion-down': {

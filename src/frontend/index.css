@@ -4,56 +4,58 @@
 
 @layer base {
   :root {
-    --background: oklch(98% 0.01 240);
-    --foreground: oklch(20% 0.02 240);
-    --card: oklch(100% 0 0);
-    --card-foreground: oklch(20% 0.02 240);
-    --popover: oklch(100% 0 0);
-    --popover-foreground: oklch(20% 0.02 240);
-    --primary: oklch(55% 0.18 240);
-    --primary-foreground: oklch(98% 0.01 240);
-    --secondary: oklch(92% 0.02 240);
-    --secondary-foreground: oklch(20% 0.02 240);
-    --muted: oklch(94% 0.01 240);
-    --muted-foreground: oklch(50% 0.02 240);
-    --accent: oklch(92% 0.02 240);
-    --accent-foreground: oklch(20% 0.02 240);
-    --destructive: oklch(55% 0.20 25);
-    --destructive-foreground: oklch(98% 0.01 240);
-    --success: oklch(60% 0.15 145);
-    --success-foreground: oklch(98% 0.01 240);
-    --warning: oklch(70% 0.15 70);
-    --warning-foreground: oklch(20% 0.02 240);
-    --border: oklch(88% 0.01 240);
-    --input: oklch(88% 0.01 240);
-    --ring: oklch(55% 0.18 240);
+    /* Cyber bunker theme - light mode */
+    --background: oklch(96% 0.01 200);
+    --foreground: oklch(18% 0.03 200);
+    --card: oklch(98% 0.005 200);
+    --card-foreground: oklch(18% 0.03 200);
+    --popover: oklch(98% 0.005 200);
+    --popover-foreground: oklch(18% 0.03 200);
+    --primary: oklch(48% 0.22 260);
+    --primary-foreground: oklch(98% 0.01 200);
+    --secondary: oklch(65% 0.18 180);
+    --secondary-foreground: oklch(98% 0.01 200);
+    --muted: oklch(90% 0.02 200);
+    --muted-foreground: oklch(45% 0.03 200);
+    --accent: oklch(58% 0.20 300);
+    --accent-foreground: oklch(98% 0.01 200);
+    --destructive: oklch(55% 0.22 25);
+    --destructive-foreground: oklch(98% 0.01 200);
+    --success: oklch(62% 0.18 145);
+    --success-foreground: oklch(98% 0.01 200);
+    --warning: oklch(72% 0.16 70);
+    --warning-foreground: oklch(18% 0.03 200);
+    --border: oklch(82% 0.02 200);
+    --input: oklch(82% 0.02 200);
+    --ring: oklch(48% 0.22 260);
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: oklch(15% 0.02 240);
-    --foreground: oklch(95% 0.01 240);
-    --card: oklch(18% 0.02 240);
-    --card-foreground: oklch(95% 0.01 240);
-    --popover: oklch(18% 0.02 240);
-    --popover-foreground: oklch(95% 0.01 240);
-    --primary: oklch(65% 0.18 240);
-    --primary-foreground: oklch(15% 0.02 240);
-    --secondary: oklch(25% 0.02 240);
-    --secondary-foreground: oklch(95% 0.01 240);
-    --muted: oklch(25% 0.02 240);
-    --muted-foreground: oklch(65% 0.02 240);
-    --accent: oklch(25% 0.02 240);
-    --accent-foreground: oklch(95% 0.01 240);
-    --destructive: oklch(55% 0.20 25);
-    --destructive-foreground: oklch(95% 0.01 240);
-    --success: oklch(60% 0.15 145);
-    --success-foreground: oklch(95% 0.01 240);
-    --warning: oklch(70% 0.15 70);
-    --warning-foreground: oklch(15% 0.02 240);
-    --border: oklch(30% 0.02 240);
-    --input: oklch(30% 0.02 240);
-    --ring: oklch(65% 0.18 240);
+    /* Cyber bunker theme - dark mode */
+    --background: oklch(12% 0.03 220);
+    --foreground: oklch(92% 0.01 200);
+    --card: oklch(16% 0.03 220);
+    --card-foreground: oklch(92% 0.01 200);
+    --popover: oklch(16% 0.03 220);
+    --popover-foreground: oklch(92% 0.01 200);
+    --primary: oklch(58% 0.24 260);
+    --primary-foreground: oklch(12% 0.03 220);
+    --secondary: oklch(72% 0.20 180);
+    --secondary-foreground: oklch(12% 0.03 220);
+    --muted: oklch(22% 0.03 220);
+    --muted-foreground: oklch(62% 0.02 200);
+    --accent: oklch(65% 0.22 300);
+    --accent-foreground: oklch(12% 0.03 220);
+    --destructive: oklch(58% 0.24 25);
+    --destructive-foreground: oklch(92% 0.01 200);
+    --success: oklch(65% 0.20 145);
+    --success-foreground: oklch(12% 0.03 220);
+    --warning: oklch(75% 0.18 70);
+    --warning-foreground: oklch(12% 0.03 220);
+    --border: oklch(28% 0.03 220);
+    --input: oklch(28% 0.03 220);
+    --ring: oklch(58% 0.24 260);
   }
 }
 
@@ -74,28 +76,4 @@
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
-}
-
-/* Quiz gameplay layout utilities */
-.quiz-gameplay-container {
-  display: flex;
-  flex-direction: column;
-  min-height: calc(100vh - 73px);
-}
-
-.quiz-gameplay-scroll-container {
-  flex: 1;
-  overflow-y: auto;
-  padding-bottom: 120px;
-}
-
-.quiz-gameplay-action-bar {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: hsl(var(--card));
-  border-top: 1px solid hsl(var(--border));
-  padding: 1rem 0;
-  z-index: 30;
 }

@@ -3,8 +3,6 @@ import { useGetAllQuestions, useGetAllBlockNames } from '../hooks/useQueries';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { Switch } from '../components/ui/switch';
-import { Label } from '../components/ui/label';
 import { ArrowLeft, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { createRandomSubset } from './randomSubset';
 import { AdaptiveScheduler } from './adaptiveScheduler';
@@ -14,6 +12,7 @@ import PreQuizSummaryView from './PreQuizSummaryView';
 import type { Question } from '../backend';
 import type { WrongAnswerEntry } from './wrongAnswerTypes';
 import { useQuestionTranslation } from '../hooks/useQuestionTranslation';
+import { usePressHold } from '../hooks/usePressHold';
 
 type QuizStep = 'blockSelection' | 'questionCount' | 'summary' | 'quiz';
 
@@ -36,10 +35,10 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [showTranslation, setShowTranslation] = useState(false);
 
-  const { getTranslation, isTranslating, error: translationError } = useQuestionTranslation();
+  const { getTranslation, getCachedTranslation } = useQuestionTranslation();
   const [translatedText, setTranslatedText] = useState<string | null>(null);
+  const [isPressed, pressHandlers] = usePressHold();
 
   const blockNamesMap = new Map(blockNamesData);
   const totalBlocks = getBlockCount(allQuestions.length);
@@ -51,18 +50,31 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
     }
   }, [currentStep, onStepChange]);
 
-  // Reset translation when question changes
+  // Reset selection when question changes
   useEffect(() => {
+    setSelectedAnswer(null);
     setTranslatedText(null);
   }, [currentQuestionId]);
 
-  // Fetch translation when toggle is enabled
+  // Handle press-and-hold translation
   useEffect(() => {
-    if (showTranslation && !translatedText && sessionQuestions[currentQuestionId]) {
+    if (isPressed && sessionQuestions[currentQuestionId]) {
       const currentQuestion = sessionQuestions[currentQuestionId];
-      getTranslation(currentQuestion.text).then(setTranslatedText);
+      const cached = getCachedTranslation(currentQuestion.text);
+      
+      if (cached) {
+        setTranslatedText(cached);
+      } else {
+        getTranslation(currentQuestion.text).then((translation) => {
+          if (translation && isPressed) {
+            setTranslatedText(translation);
+          }
+        });
+      }
+    } else {
+      setTranslatedText(null);
     }
-  }, [showTranslation, translatedText, currentQuestionId, sessionQuestions, getTranslation]);
+  }, [isPressed, currentQuestionId, sessionQuestions, getTranslation, getCachedTranslation]);
 
   const handleBlockSelect = (blockIndex: number) => {
     setSelectedBlockIndex(blockIndex);
@@ -169,7 +181,7 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
   if (currentStep === 'blockSelection') {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <Card>
+        <Card className="shadow-cyber">
           <CardHeader>
             <CardTitle>Select Question Block</CardTitle>
             <CardDescription>
@@ -185,7 +197,7 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
                   <Button
                     key={i}
                     variant="outline"
-                    className="h-auto py-4 flex flex-col items-start"
+                    className="h-auto py-4 flex flex-col items-start hover:bg-accent hover:text-accent-foreground hover:border-accent"
                     onClick={() => handleBlockSelect(i)}
                   >
                     <div className="font-semibold">{blockLabel}</div>
@@ -242,16 +254,31 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
   const performance = scheduler?.getPerformance().get(currentQuestionId);
   const attemptNumber = performance ? performance.attempts + 1 : 1;
 
+  // Calculate current score
+  const currentPerformance = scheduler?.getPerformance();
+  let correctSoFar = 0;
+  let answeredSoFar = 0;
+  if (currentPerformance) {
+    currentPerformance.forEach((perf) => {
+      if (perf.attempts > 0) {
+        answeredSoFar++;
+        if (perf.correctCount > 0) {
+          correctSoFar++;
+        }
+      }
+    });
+  }
+
   return (
-    <div className="quiz-gameplay-container">
-      <div className="quiz-gameplay-scroll-container">
-        <div className="max-w-3xl mx-auto px-4 pt-6 pb-2">
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="max-w-3xl mx-auto px-4 pt-6">
           <div className="mb-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleBackToBlockSelection}
-              className="mb-2"
+              className="mb-2 hover:bg-accent hover:text-accent-foreground"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Block Selection
@@ -266,49 +293,26 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
             </div>
           </div>
 
-          <Card>
+          <Card className="shadow-cyber">
             <CardHeader className="space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <CardTitle className="text-xl leading-relaxed flex-1">
-                  {currentQuestion.text}
+                  {translatedText || currentQuestion.text}
                 </CardTitle>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Switch
-                    id="translation-toggle"
-                    checked={showTranslation}
-                    onCheckedChange={setShowTranslation}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0 touch-manipulation select-none"
+                  {...pressHandlers}
+                >
+                  <img
+                    src="/assets/generated/english-flag-icon.dim_24x24.png"
+                    alt="EN"
+                    className="w-5 h-5 mr-1"
                   />
-                  <Label
-                    htmlFor="translation-toggle"
-                    className="text-sm cursor-pointer whitespace-nowrap flex items-center gap-1"
-                  >
-                    <img
-                      src="/assets/generated/english-flag-icon.dim_24x24.png"
-                      alt="EN"
-                      className="w-5 h-5"
-                    />
-                  </Label>
-                </div>
+                  Plan-B
+                </Button>
               </div>
-
-              {showTranslation && (
-                <div className="pt-2 border-t">
-                  {isTranslating ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Translating...
-                    </div>
-                  ) : translationError ? (
-                    <div className="text-sm text-destructive">
-                      Translation unavailable
-                    </div>
-                  ) : translatedText ? (
-                    <div className="text-base text-muted-foreground italic">
-                      {translatedText}
-                    </div>
-                  ) : null}
-                </div>
-              )}
 
               {currentQuestion.imageUrl && (
                 <div className="mt-3">
@@ -320,7 +324,7 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
                 </div>
               )}
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-3">
               {currentQuestion.answers.map((answer, index) => {
                 const isSelected = selectedAnswer === index;
                 const isCorrectAnswer = index === Number(currentQuestion.correctAnswer);
@@ -332,52 +336,59 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
                     key={index}
                     onClick={() => handleAnswerSelect(index)}
                     disabled={showFeedback}
-                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all touch-manipulation ${
                       showCorrect
-                        ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                        ? 'border-success bg-success/10'
                         : showIncorrect
-                        ? 'border-red-500 bg-red-50 dark:bg-red-950'
+                        ? 'border-destructive bg-destructive/10'
                         : isSelected
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-secondary hover:bg-secondary/10'
                     } ${showFeedback ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="flex-1">{answer}</span>
-                      {showCorrect && <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />}
-                      {showIncorrect && <XCircle className="h-5 w-5 text-red-600 shrink-0" />}
+                      {showCorrect && <CheckCircle2 className="h-5 w-5 text-success shrink-0" />}
+                      {showIncorrect && <XCircle className="h-5 w-5 text-destructive shrink-0" />}
                     </div>
                   </button>
                 );
               })}
+
+              {showFeedback && (
+                <div className="pt-4 space-y-3">
+                  <Alert variant={isCorrect ? 'default' : 'destructive'} className="border-2">
+                    <AlertDescription className="text-center font-semibold text-base">
+                      {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
+                    </AlertDescription>
+                  </Alert>
+                  <Button 
+                    onClick={handleNextQuestion} 
+                    className="w-full touch-manipulation" 
+                    size="lg"
+                    variant="default"
+                  >
+                    Next Question
+                  </Button>
+                  <div className="text-center text-sm text-muted-foreground pt-2">
+                    Score: {correctSoFar} / {answeredSoFar} correct
+                  </div>
+                </div>
+              )}
+
+              {!showFeedback && (
+                <Button
+                  onClick={handleSubmitAnswer}
+                  disabled={selectedAnswer === null}
+                  className="w-full touch-manipulation mt-4"
+                  size="lg"
+                  variant="default"
+                >
+                  Submit Answer
+                </Button>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </div>
-
-      <div className="quiz-gameplay-action-bar">
-        <div className="max-w-3xl mx-auto px-4">
-          {!showFeedback ? (
-            <Button
-              onClick={handleSubmitAnswer}
-              disabled={selectedAnswer === null}
-              className="w-full"
-              size="lg"
-            >
-              Submit Answer
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <Alert variant={isCorrect ? 'default' : 'destructive'} className="py-2">
-                <AlertDescription className="text-center font-medium">
-                  {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
-                </AlertDescription>
-              </Alert>
-              <Button onClick={handleNextQuestion} className="w-full" size="lg">
-                Next Question
-              </Button>
-            </div>
-          )}
         </div>
       </div>
     </div>

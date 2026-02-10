@@ -2,11 +2,12 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-restore-the-application-s-ui-styling-and-layout-to-match-version-56-by-removing-undoing-the-styling-layout-changes-introduced-in-later-versions-notably-version-58-ensuring-a-consistent-neutral-shadcn-tailwind-look-across-the-app-shell-and-quiz-related-screens-including-pregamequestioncountview-prequizsummaryview-and-quizresults",
-      "featureTitle": "Restore the application’s UI styling and layout to match Version 56 by removing/undoing the styling/layout changes introduced in later versions (notably Version 58+), ensuring a consistent neutral Shadcn/Tailwind look across the app shell and quiz-related screens (including PreGameQuestionCountView, PreQuizSummaryView, and QuizResults).",
+      "featureId": "feature-update-the-app-s-displayed-build-version-metadata-so-it-always-reflects-the-actual-build-do-not-hardcode-version-56-including-in-build-info-generation-and-in-the-deployment-diagnostics-ui",
+      "featureTitle": "Update the app’s displayed build/version metadata so it always reflects the actual build (do not hardcode version '56'), including in build info generation and in the Deployment Diagnostics UI.",
       "files": [
-        "frontend/src/App.tsx",
-        "frontend/src/quiz/QuizGameplay.tsx"
+        "frontend/src/components/BuildIdentityFooter.tsx",
+        "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+        "frontend/src/utils/buildStamp.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -23,11 +24,16 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-restore-version-56-header-navigation-behavior-so-that-the-play-and-edit-header-actions-are-visible-throughout-the-start-flow-and-non-game-views-and-are-hidden-only-while-the-user-is-actively-in-the-in-game-question-answering-screen-the-active-quiz-step",
-      "featureTitle": "Restore Version 56 header navigation behavior so that the “Play” and “Edit” header actions are visible throughout the start flow and non-game views, and are hidden only while the user is actively in the in-game question-answering screen (the active quiz step).",
+      "featureId": "feature-ensure-the-project-is-live-publish-ready-by-validating-and-documenting-runtime-backend-canister-configuration-via-env-json-and-make-the-live-readiness-state-unambiguous-when-env-json-is-missing-or-canister-id-backend-is-empty",
+      "featureTitle": "Ensure the project is live-publish ready by validating and documenting runtime backend canister configuration via /env.json, and make the live readiness state unambiguous when /env.json is missing or CANISTER_ID_BACKEND is empty.",
       "files": [
-        "frontend/src/App.tsx",
-        "frontend/src/quiz/QuizGameplay.tsx"
+        "frontend/index.html",
+        "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+        "frontend/src/types/env.d.ts",
+        "frontend/src/utils/canisterIdResolution.ts",
+        "frontend/src/utils/formatPublishChecklist.ts",
+        "frontend/src/utils/liveReadiness.ts",
+        "frontend/src/utils/runtimeEnvStatus.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -40,28 +46,6 @@
       ],
       "testIds": [
         "REQ-2"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-update-the-build-version-identity-shown-in-the-ui-to-report-version-56-e-g-the-footer-build-version-and-any-diagnostics-build-info-so-the-published-build-is-clearly-labeled-as-v56",
-      "featureTitle": "Update the build/version identity shown in the UI to report Version 56 (e.g., the footer build version and any diagnostics build info), so the published build is clearly labeled as v56.",
-      "files": [
-        "frontend/src/components/BuildIdentityFooter.tsx",
-        "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
-        "frontend/src/utils/buildStamp.ts"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-3"
       ],
       "confidence": "high"
     }

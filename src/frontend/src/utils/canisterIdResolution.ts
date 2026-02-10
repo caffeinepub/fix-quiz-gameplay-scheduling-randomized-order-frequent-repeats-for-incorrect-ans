@@ -26,9 +26,9 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
     import.meta.env.VITE_CANISTER_ID_BACKEND ||
     import.meta.env.VITE_BACKEND_CANISTER_ID;
   
-  if (viteCanisterId) {
+  if (viteCanisterId && typeof viteCanisterId === 'string' && viteCanisterId.trim()) {
     return {
-      canisterId: viteCanisterId,
+      canisterId: viteCanisterId.trim(),
       source: 'import.meta.env',
       sourcesAttempted,
     };
@@ -38,9 +38,10 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
   sourcesAttempted.push('window.__ENV__');
   try {
     const envJson = window.__ENV__;
-    if (envJson?.CANISTER_ID_BACKEND) {
+    const runtimeCanisterId = envJson?.CANISTER_ID_BACKEND;
+    if (runtimeCanisterId && typeof runtimeCanisterId === 'string' && runtimeCanisterId.trim()) {
       return {
-        canisterId: envJson.CANISTER_ID_BACKEND,
+        canisterId: runtimeCanisterId.trim(),
         source: 'window.__ENV__',
         sourcesAttempted,
       };
@@ -88,7 +89,7 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
       canisterId: null,
       source: 'none',
       sourcesAttempted,
-      error: 'Backend canister ID not found in deployment configuration. The frontend canister ID (URL subdomain) cannot be used as the backend canister ID. Please ensure env.json contains CANISTER_ID_BACKEND or build-time variables include VITE_CANISTER_ID_BACKEND.',
+      error: 'Backend canister ID not found in deployment configuration. The frontend canister ID (URL subdomain) cannot be used as the backend canister ID. Please ensure env.json contains a non-empty CANISTER_ID_BACKEND or build-time variables include VITE_CANISTER_ID_BACKEND.',
     };
   }
 
@@ -97,7 +98,7 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
     canisterId: null,
     source: 'none',
     sourcesAttempted,
-    error: 'Backend canister ID not found. Please ensure the canister is deployed and environment is configured correctly (via import.meta.env or window.__ENV__).',
+    error: 'Backend canister ID not found. Please ensure the canister is deployed and environment is configured correctly with a non-empty value (via import.meta.env or window.__ENV__).',
   };
 }
 

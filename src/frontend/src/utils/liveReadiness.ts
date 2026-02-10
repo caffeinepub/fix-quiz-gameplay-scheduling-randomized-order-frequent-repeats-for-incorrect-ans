@@ -35,7 +35,7 @@ export function evaluateReadiness(
       details: [
         'The backend canister ID could not be resolved.',
         canisterIdError || 'No canister ID available from any source.',
-        'To fix: Provide CANISTER_ID_BACKEND in /env.json for runtime configuration, or set VITE_CANISTER_ID_BACKEND at build time.',
+        'To fix: Provide a non-empty CANISTER_ID_BACKEND in /env.json for runtime configuration, or set VITE_CANISTER_ID_BACKEND at build time.',
       ],
       error: canisterIdError,
     };

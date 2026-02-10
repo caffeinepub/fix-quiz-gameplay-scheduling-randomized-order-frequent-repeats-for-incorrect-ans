@@ -9,7 +9,7 @@ export function useQuestionTranslation() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cacheRef = useRef<TranslationCache>({});
-  const activeRequestRef = useRef<string | null>(null);
+  const activeRequestsRef = useRef<Set<string>>(new Set());
 
   const getTranslation = useCallback(async (text: string): Promise<string | null> => {
     if (!text.trim()) {
@@ -21,15 +21,15 @@ export function useQuestionTranslation() {
       return cacheRef.current[text];
     }
 
-    // If there's already a request for this text, wait for it
-    if (activeRequestRef.current === text) {
+    // If there's already a request for this text, return null (will use cache when ready)
+    if (activeRequestsRef.current.has(text)) {
       return null;
     }
 
     try {
       setIsTranslating(true);
       setError(null);
-      activeRequestRef.current = text;
+      activeRequestsRef.current.add(text);
 
       const request: TranslationRequest = {
         text,
@@ -51,7 +51,7 @@ export function useQuestionTranslation() {
       return null;
     } finally {
       setIsTranslating(false);
-      activeRequestRef.current = null;
+      activeRequestsRef.current.delete(text);
     }
   }, []);
 

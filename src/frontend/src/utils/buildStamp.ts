@@ -42,11 +42,11 @@ export function getBuildInfo(): BuildStamp {
     ? buildTimeTimestamp.trim()
     : new Date().toISOString();
 
-  // Try build-time injected version first - FIXED TO v56
+  // Try build-time injected version first, fallback to 'dev' (not a fixed historic number)
   const buildTimeVersion = import.meta.env.VITE_APP_VERSION;
   const version = buildTimeVersion && typeof buildTimeVersion === 'string' && buildTimeVersion.trim()
     ? buildTimeVersion.trim()
-    : '56';
+    : 'dev';
 
   // Determine environment
   const mode = import.meta.env.MODE || 'production';

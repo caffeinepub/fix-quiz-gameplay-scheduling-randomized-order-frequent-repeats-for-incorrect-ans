@@ -9,13 +9,18 @@
             (function() {
                 // Cache-bust the env.json fetch to ensure fresh config on every load
                 var cacheBuster = 'cb=' + Date.now();
+                
+                // Track runtime status for diagnostics
+                window.__ENV_LOAD_STATUS__ = 'loading';
+                
                 fetch('/env.json?' + cacheBuster, {
                     cache: 'no-store'
                 })
                     .then(function(response) {
                         if (!response.ok) {
-                            console.warn('[env.json] Not found or not accessible (status: ' + response.status + '). Using empty environment. For live deployments, ensure /env.json exists with CANISTER_ID_BACKEND.');
+                            console.warn('[env.json] Not found or not accessible (status: ' + response.status + '). Using empty environment. For live deployments, ensure /env.json exists with a non-empty CANISTER_ID_BACKEND.');
                             window.__ENV__ = {};
+                            window.__ENV_LOAD_STATUS__ = 'missing';
                             return null;
                         }
                         return response.json();
@@ -23,12 +28,14 @@
                     .then(function(env) {
                         if (env) {
                             window.__ENV__ = env;
+                            window.__ENV_LOAD_STATUS__ = 'loaded';
                             console.log('[env.json] Runtime environment loaded successfully:', Object.keys(env).join(', '));
                         }
                     })
                     .catch(function(error) {
-                        console.warn('[env.json] Failed to load:', error.message, '- Using empty environment. For live deployments, ensure /env.json is accessible.');
+                        console.warn('[env.json] Failed to load:', error.message, '- Using empty environment. For live deployments, ensure /env.json is accessible with a non-empty CANISTER_ID_BACKEND.');
                         window.__ENV__ = {};
+                        window.__ENV_LOAD_STATUS__ = 'error';
                     });
             })();
         </script>

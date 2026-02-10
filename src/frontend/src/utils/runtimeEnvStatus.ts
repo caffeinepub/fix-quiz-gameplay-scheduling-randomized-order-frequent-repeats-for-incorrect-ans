@@ -14,7 +14,36 @@ export interface RuntimeEnvStatus {
  */
 export async function inspectRuntimeEnv(): Promise<RuntimeEnvStatus> {
   const envJson = window.__ENV__;
-  const canisterIdPresent = !!(envJson?.CANISTER_ID_BACKEND);
+  const loadStatus = window.__ENV_LOAD_STATUS__;
+  const canisterIdValue = envJson?.CANISTER_ID_BACKEND;
+  const canisterIdPresent = !!(canisterIdValue && typeof canisterIdValue === 'string' && canisterIdValue.trim());
+
+  // Check load status first (set by index.html pre-bootstrap script)
+  if (loadStatus === 'missing') {
+    return {
+      envJsonAccessible: false,
+      canisterIdPresent: false,
+      message: 'Runtime environment configuration is not loaded. The /env.json file is missing or unreachable.',
+      troubleshootingSteps: [
+        'Ensure /env.json exists in the deployed frontend assets.',
+        'Verify that /env.json is accessible from the browser (check network tab).',
+        'For live deployments, /env.json must contain a non-empty CANISTER_ID_BACKEND value.',
+      ],
+    };
+  }
+
+  if (loadStatus === 'error') {
+    return {
+      envJsonAccessible: false,
+      canisterIdPresent: false,
+      message: 'Runtime environment configuration failed to load. The /env.json file is unreachable or invalid.',
+      troubleshootingSteps: [
+        'Check that /env.json contains valid JSON.',
+        'Verify that /env.json is accessible from the browser (check network tab).',
+        'For live deployments, /env.json must contain a non-empty CANISTER_ID_BACKEND value.',
+      ],
+    };
+  }
 
   // Check if window.__ENV__ exists at all
   if (!envJson) {
@@ -38,7 +67,7 @@ export async function inspectRuntimeEnv(): Promise<RuntimeEnvStatus> {
         troubleshootingSteps: [
           'Ensure /env.json exists in the deployed frontend assets.',
           'Verify that /env.json is accessible from the browser (check network tab).',
-          'For production deployments, /env.json must contain CANISTER_ID_BACKEND.',
+          'For live deployments, /env.json must contain a non-empty CANISTER_ID_BACKEND value.',
         ],
       };
     }
@@ -50,7 +79,7 @@ export async function inspectRuntimeEnv(): Promise<RuntimeEnvStatus> {
       troubleshootingSteps: [
         'Check that /env.json contains valid JSON.',
         'Verify that the pre-bootstrap script in index.html is loading /env.json correctly.',
-        'Ensure CANISTER_ID_BACKEND is defined in /env.json.',
+        'Ensure CANISTER_ID_BACKEND is defined in /env.json with a non-empty value.',
       ],
     };
   }
@@ -60,10 +89,10 @@ export async function inspectRuntimeEnv(): Promise<RuntimeEnvStatus> {
     return {
       envJsonAccessible: true,
       canisterIdPresent: false,
-      message: 'Runtime environment is loaded, but CANISTER_ID_BACKEND is missing from window.__ENV__.',
+      message: 'Runtime environment is loaded, but CANISTER_ID_BACKEND is missing or empty in window.__ENV__.',
       troubleshootingSteps: [
-        'Add CANISTER_ID_BACKEND to /env.json with your backend canister ID.',
-        'For production/live deployments, this key is required for the app to connect to the backend.',
+        'Add CANISTER_ID_BACKEND to /env.json with your backend canister ID (non-empty value).',
+        'For live deployments, this key is required for the app to connect to the backend.',
         'Example: { "CANISTER_ID_BACKEND": "your-canister-id-here" }',
       ],
     };
@@ -84,7 +113,16 @@ export async function inspectRuntimeEnv(): Promise<RuntimeEnvStatus> {
  */
 export function getRuntimeEnvStatusSync(): Pick<RuntimeEnvStatus, 'canisterIdPresent' | 'message'> {
   const envJson = window.__ENV__;
-  const canisterIdPresent = !!(envJson?.CANISTER_ID_BACKEND);
+  const loadStatus = window.__ENV_LOAD_STATUS__;
+  const canisterIdValue = envJson?.CANISTER_ID_BACKEND;
+  const canisterIdPresent = !!(canisterIdValue && typeof canisterIdValue === 'string' && canisterIdValue.trim());
+
+  if (loadStatus === 'missing' || loadStatus === 'error') {
+    return {
+      canisterIdPresent: false,
+      message: 'Runtime environment (window.__ENV__) is not loaded or failed to load. Check that /env.json is accessible with a non-empty CANISTER_ID_BACKEND.',
+    };
+  }
 
   if (!envJson) {
     return {
@@ -96,7 +134,7 @@ export function getRuntimeEnvStatusSync(): Pick<RuntimeEnvStatus, 'canisterIdPre
   if (!canisterIdPresent) {
     return {
       canisterIdPresent: false,
-      message: 'CANISTER_ID_BACKEND is missing from window.__ENV__. Add it to /env.json for production deployments.',
+      message: 'CANISTER_ID_BACKEND is missing or empty in window.__ENV__. Add a non-empty value to /env.json for live deployments.',
     };
   }
 

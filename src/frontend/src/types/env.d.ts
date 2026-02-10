@@ -18,4 +18,5 @@ interface Window {
   __ENV__?: {
     CANISTER_ID_BACKEND?: string;
   };
+  __ENV_LOAD_STATUS__?: 'loading' | 'loaded' | 'missing' | 'error';
 }

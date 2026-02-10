@@ -1,58 +1,52 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-09T18:21:56.176Z",
+  "generatedAt": "2026-02-10T18:18:52.322Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 3,
+    "total": 2,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Restore the application’s UI styling and layout to match Version 56 by removing/undoing the styling/layout changes introduced in later versions (notably Version 58+), ensuring a consistent neutral Shadcn/Tailwind look across the app shell and quiz-related screens (including PreGameQuestionCountView, PreQuizSummaryView, and QuizResults).",
+        "summary": "Update the app’s displayed build/version metadata so it always reflects the actual build (do not hardcode version '56'), including in build info generation and in the Deployment Diagnostics UI.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/App.tsx",
-          "frontend/src/quiz/PreGameQuestionCountView.tsx",
-          "frontend/src/quiz/PreQuizSummaryView.tsx",
-          "frontend/src/quiz/QuizResults.tsx",
-          "frontend/src/quiz/QuizGameplay.tsx",
-          "frontend/index.css"
+          "frontend/src/utils/buildStamp.ts",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "frontend/src/components/BuildIdentityFooter.tsx",
+          "frontend/src/utils/shareLiveVerificationInfo.ts"
         ],
         "matchedFiles": [
-          "frontend/src/App.tsx",
-          "frontend/src/quiz/QuizGameplay.tsx"
+          "frontend/src/utils/buildStamp.ts",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "frontend/src/components/BuildIdentityFooter.tsx"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Restore Version 56 header navigation behavior so that the “Play” and “Edit” header actions are visible throughout the start flow and non-game views, and are hidden only while the user is actively in the in-game question-answering screen (the active quiz step).",
+        "summary": "Ensure the project is live-publish ready by validating and documenting runtime backend canister configuration via /env.json, and make the live readiness state unambiguous when /env.json is missing or CANISTER_ID_BACKEND is empty.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/App.tsx",
-          "frontend/src/quiz/QuizGameplay.tsx"
+          "frontend/index.html",
+          "frontend/src/types/env.d.ts",
+          "frontend/src/utils/runtimeEnvStatus.ts",
+          "frontend/src/utils/canisterIdResolution.ts",
+          "frontend/src/utils/liveReadiness.ts",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "frontend/src/utils/formatPublishChecklist.ts"
         ],
         "matchedFiles": [
-          "frontend/src/App.tsx",
-          "frontend/src/quiz/QuizGameplay.tsx"
-        ]
-      },
-      {
-        "id": "REQ-3",
-        "summary": "Update the build/version identity shown in the UI to report Version 56 (e.g., the footer build version and any diagnostics build info), so the published build is clearly labeled as v56.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/utils/buildStamp.ts",
-          "frontend/src/components/BuildIdentityFooter.tsx",
-          "frontend/src/components/DeploymentDiagnosticsPanel.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/utils/buildStamp.ts",
-          "frontend/src/components/BuildIdentityFooter.tsx",
-          "frontend/src/components/DeploymentDiagnosticsPanel.tsx"
+          "frontend/index.html",
+          "frontend/src/types/env.d.ts",
+          "frontend/src/utils/runtimeEnvStatus.ts",
+          "frontend/src/utils/canisterIdResolution.ts",
+          "frontend/src/utils/liveReadiness.ts",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "frontend/src/utils/formatPublishChecklist.ts"
         ]
       }
     ]
@@ -62,11 +56,15 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/App.tsx",
+    "frontend/index.html",
     "frontend/src/components/BuildIdentityFooter.tsx",
     "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
-    "frontend/src/quiz/QuizGameplay.tsx",
+    "frontend/src/types/env.d.ts",
     "frontend/src/utils/buildStamp.ts",
+    "frontend/src/utils/canisterIdResolution.ts",
+    "frontend/src/utils/formatPublishChecklist.ts",
+    "frontend/src/utils/liveReadiness.ts",
+    "frontend/src/utils/runtimeEnvStatus.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

@@ -1,82 +1,56 @@
 {
   "kind": "build_request",
-  "title": "Rollback app behavior to match Version 56 and label build as v56",
+  "title": "Prepare current build for live publishing (runtime config + accurate build/version diagnostics)",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Restore the application’s UI styling and layout to match Version 56 by removing/undoing the styling/layout changes introduced in later versions (notably Version 58+), ensuring a consistent neutral Shadcn/Tailwind look across the app shell and quiz-related screens (including PreGameQuestionCountView, PreQuizSummaryView, and QuizResults).",
+      "text": "Update the app’s displayed build/version metadata so it always reflects the actual build (do not hardcode version '56'), including in build info generation and in the Deployment Diagnostics UI.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-3"
+          "msg-4"
         ],
         "quotes": [
-          "please return in version 56, as newer versions is ruined."
+          "go live with this"
         ]
       },
       "acceptanceCriteria": [
-        "PreGameQuestionCountView, PreQuizSummaryView, and QuizResults use the same neutral Shadcn/Tailwind visual treatment (spacing, typography, surfaces, and borders) as the Version 56 baseline.",
-        "No new styling/layout regressions are introduced in the app shell and core quiz flow screens compared to the intended Version 56 look."
+        "In Deployment Diagnostics, the displayed version is sourced from build metadata (e.g., VITE_APP_VERSION) and is not hardcoded to '56'.",
+        "The build info utility does not fall back to a fixed version string; if no build-time version is provided, it uses a clearly dynamic fallback (e.g., 'dev' or similar) rather than a specific historic version number.",
+        "After rebuilding, the Diagnostics panel and any footer/build info surfaces show consistent version values."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Restore Version 56 header navigation behavior so that the “Play” and “Edit” header actions are visible throughout the start flow and non-game views, and are hidden only while the user is actively in the in-game question-answering screen (the active quiz step).",
+      "text": "Ensure the project is live-publish ready by validating and documenting runtime backend canister configuration via /env.json, and make the live readiness state unambiguous when /env.json is missing or CANISTER_ID_BACKEND is empty.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-3"
+          "msg-4"
         ],
         "quotes": [
-          "please return in version 56, as newer versions is ruined."
+          "go live with this"
         ]
       },
       "acceptanceCriteria": [
-        "When the user is in any non-question-answering view (e.g., editor, pre-game/start flow, results, wrong answers review), the header shows the Play action and (for admins) the Edit action.",
-        "While actively answering questions (the in-game question-answering screen), the header Play/Edit actions are hidden.",
-        "Switching between views reliably updates header visibility without requiring a page refresh."
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "text": "Update the build/version identity shown in the UI to report Version 56 (e.g., the footer build version and any diagnostics build info), so the published build is clearly labeled as v56.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-3"
-        ],
-        "quotes": [
-          "please return in version 56, as newer versions is ruined."
-        ]
-      },
-      "acceptanceCriteria": [
-        "The build version displayed in the BuildIdentityFooter is \"v56\".",
-        "Any build version shown in deployment/diagnostics UI reflects \"56\" consistently for the same build."
+        "If frontend/public/env.json is missing in a deployed environment, the app clearly indicates the backend canister ID is not resolved and Live Readiness shows 'Not ready'.",
+        "If frontend/public/env.json exists but CANISTER_ID_BACKEND is an empty string, the app treats it as not configured and Live Readiness shows 'Not ready'.",
+        "Deployment Diagnostics 'Publish to Live Canister' section instructions remain accurate and explicitly mention that /env.json must include a non-empty CANISTER_ID_BACKEND value for live deployments.",
+        "The 'Copy Publish Checklist' output includes the resolved canister ID when available, and clearly shows '(not resolved)' when not available."
       ]
     }
   ],
   "constraints": [
-    "Do not edit files under frontend/immutablePaths: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useInternetIdentity.tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, frontend/src/components/ui.",
-    "Backend must remain a single Motoko actor in backend/main.mo; add backend/migration.mo only if a state schema upgrade is required."
+    "Do not edit files under frontend/src/components/ui (shadcn UI components are read-only).",
+    "Do not edit immutable frontend hook files: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useInternetIdentity.tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx."
   ],
   "nonGoals": [
-    "Adding new product features beyond restoring Version 56 look/behavior.",
-    "Changing authentication provider (Internet Identity only).",
-    "Introducing new backend services, databases, or external integrations."
+    "Performing the actual live publish/deployment from within the app (publishing is done via the Caffeine editor).",
+    "Changing backend canister logic or data schema as part of the go-live task."
   ],
   "imageRequirements": {
     "required": [],
     "edits": []
-  },
-  "userProfileUpdate": {
-    "goalsToAdd": [],
-    "goalsToRemove": [],
-    "preferencesToAdd": [],
-    "preferencesToRemove": [],
-    "miscToAdd": [],
-    "miscToRemove": [],
-    "fieldsToSet": {},
-    "fieldsToDelete": []
   }
 }

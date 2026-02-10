@@ -157,7 +157,7 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <header className="w-full border-b bg-card">
+        <header className="w-full border-b bg-card shadow-cyber">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <BookOpen className="h-8 w-8 text-primary" />
@@ -170,7 +170,7 @@ export default function App() {
                 variant="ghost"
                 size="sm"
                 onClick={handleOpenPublishHelp}
-                className="text-muted-foreground"
+                className="text-muted-foreground hover:text-accent"
                 title="Publish help"
               >
                 <Rocket className="h-4 w-4" />
@@ -179,7 +179,7 @@ export default function App() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowDiagnostics(true)}
-                className="text-muted-foreground"
+                className="text-muted-foreground hover:text-accent"
                 title="Diagnostics"
               >
                 <Bug className="h-4 w-4" />
@@ -190,7 +190,7 @@ export default function App() {
         </header>
 
         <main className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md shadow-cyber">
             <CardHeader>
               <CardTitle className="text-center">Welcome to TN intelligence Quiz</CardTitle>
               <CardDescription className="text-center">
@@ -223,7 +223,7 @@ export default function App() {
     
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <header className="w-full border-b bg-card">
+        <header className="w-full border-b bg-card shadow-cyber">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <BookOpen className="h-8 w-8 text-primary" />
@@ -236,7 +236,7 @@ export default function App() {
                 variant="ghost"
                 size="sm"
                 onClick={handleOpenPublishHelp}
-                className="text-muted-foreground"
+                className="text-muted-foreground hover:text-accent"
                 title="Publish help"
               >
                 <Rocket className="h-4 w-4" />
@@ -245,7 +245,7 @@ export default function App() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowDiagnostics(true)}
-                className="text-muted-foreground"
+                className="text-muted-foreground hover:text-accent"
                 title="Diagnostics"
               >
                 <Bug className="h-4 w-4" />
@@ -256,7 +256,7 @@ export default function App() {
         </header>
 
         <main className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl border-destructive">
+          <Card className="w-full max-w-2xl border-destructive shadow-cyber">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">
                 {stoppedCanisterInfo.isStopped ? (
@@ -292,85 +292,94 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      
-                      <div className="text-sm">
-                        <div className="font-semibold mb-2">To start the canister:</div>
-                        <ol className="list-decimal list-inside space-y-1 text-xs ml-2">
+                      <div className="text-sm space-y-2">
+                        <div className="font-semibold">Recovery Steps:</div>
+                        <ol className="list-decimal list-inside space-y-1 ml-2">
                           {getStoppedCanisterRecoverySteps(isLocalNetwork).map((step, idx) => (
-                            <li key={idx}>{step}</li>
+                            <li key={idx} className="text-xs">{step}</li>
                           ))}
                         </ol>
                       </div>
-
-                      <div className="text-xs pt-2 border-t border-destructive/20">
-                        <div><strong>Network:</strong> {connectionInfo.network}</div>
-                        <div><strong>Host:</strong> {connectionInfo.host}</div>
-                        <div><strong>Canister ID:</strong> {connectionInfo.canisterId || '(not found)'}</div>
-                        <div><strong>Source:</strong> {connectionInfo.canisterIdSource}</div>
+                    </AlertDescription>
+                  </Alert>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleRetryConnection}
+                      disabled={isRetrying}
+                      variant="default"
+                      className="flex-1"
+                    >
+                      {isRetrying ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Retrying...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Retry Connection
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => setShowDiagnostics(true)}
+                      variant="outline"
+                    >
+                      <Bug className="h-4 w-4 mr-2" />
+                      Diagnostics
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Connection Failed</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      <div className="text-sm space-y-2">
+                        <p>The application cannot connect to the backend canister.</p>
+                        <div className="font-mono text-xs bg-muted p-2 rounded">
+                          {actorError?.message || 'Unknown error'}
+                        </div>
                       </div>
                     </AlertDescription>
                   </Alert>
-                </>
-              ) : (
-                <Alert variant="destructive">
-                  <AlertTitle>Error Details</AlertTitle>
-                  <AlertDescription className="mt-2 space-y-2">
-                    <div className="font-mono text-sm break-all">
-                      {actorError?.message || 'Unknown error occurred'}
-                    </div>
-                    <div className="text-xs space-y-1 mt-3 pt-3 border-t border-destructive/20">
-                      <div><strong>Network:</strong> {connectionInfo.network}</div>
-                      <div><strong>Host:</strong> {connectionInfo.host}</div>
-                      <div><strong>Canister ID:</strong> {connectionInfo.canisterId || '(not found)'}</div>
-                      <div><strong>Source:</strong> {connectionInfo.canisterIdSource}</div>
-                      <div><strong>Sources Attempted:</strong> {connectionInfo.canisterIdSourcesAttempted.join(', ')}</div>
-                      {connectionInfo.canisterIdResolutionError && (
-                        <div className="text-destructive font-semibold mt-2">
-                          <strong>Resolution Error:</strong> {connectionInfo.canisterIdResolutionError}
-                        </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleRetryConnection}
+                      disabled={isRetrying}
+                      variant="default"
+                      className="flex-1"
+                    >
+                      {isRetrying ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Retrying...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Retry Connection
+                        </>
                       )}
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button
-                  onClick={handleRetryConnection}
-                  disabled={isRetrying}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  {isRetrying ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Retrying...
-                    </>
-                  ) : (
-                    <>
+                    </Button>
+                    <Button
+                      onClick={handleForceRefresh}
+                      variant="outline"
+                    >
                       <RefreshCw className="h-4 w-4 mr-2" />
-                      Retry Connection
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleForceRefresh}
-                  variant="default"
-                  className="flex-1"
-                >
-                  <Power className="h-4 w-4 mr-2" />
-                  Force Refresh
-                </Button>
-              </div>
-
-              <Button
-                onClick={() => setShowDiagnostics(true)}
-                variant="outline"
-                className="w-full"
-              >
-                <Bug className="h-4 w-4 mr-2" />
-                View Full Diagnostics
-              </Button>
+                      Force Refresh
+                    </Button>
+                    <Button
+                      onClick={() => setShowDiagnostics(true)}
+                      variant="outline"
+                    >
+                      <Bug className="h-4 w-4 mr-2" />
+                      Diagnostics
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </main>
@@ -388,10 +397,20 @@ export default function App() {
     );
   }
 
-  // Authenticated view
+  // Profile setup modal
+  if (showProfileSetup) {
+    return (
+      <>
+        <ProfileSetup onComplete={handleProfileComplete} />
+        <Toaster />
+      </>
+    );
+  }
+
+  // Main authenticated view
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="w-full border-b bg-card sticky top-0 z-40">
+      <header className="w-full border-b bg-card shadow-cyber sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <BookOpen className="h-8 w-8 text-primary" />
@@ -403,44 +422,24 @@ export default function App() {
             {!isInActiveQuiz && (
               <>
                 <Button
-                  variant={currentView === 'gameplay' ? 'default' : 'ghost'}
+                  variant={currentView === 'gameplay' ? 'default' : 'outline'}
                   size="sm"
                   onClick={handleStartQuiz}
                   className="hidden sm:flex"
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  Play
-                </Button>
-                <Button
-                  variant={currentView === 'gameplay' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={handleStartQuiz}
-                  className="sm:hidden"
-                  title="Play"
-                >
-                  <Play className="h-4 w-4" />
+                  Play Quiz
                 </Button>
                 {isAdmin && (
-                  <>
-                    <Button
-                      variant={currentView === 'editor' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={handleBackToEditor}
-                      className="hidden sm:flex"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant={currentView === 'editor' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={handleBackToEditor}
-                      className="sm:hidden"
-                      title="Edit"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </>
+                  <Button
+                    variant={currentView === 'editor' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={handleBackToEditor}
+                    className="hidden sm:flex"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Questions
+                  </Button>
                 )}
               </>
             )}
@@ -448,7 +447,7 @@ export default function App() {
               variant="ghost"
               size="sm"
               onClick={handleOpenPublishHelp}
-              className="text-muted-foreground"
+              className="text-muted-foreground hover:text-accent"
               title="Publish help"
             >
               <Rocket className="h-4 w-4" />
@@ -457,7 +456,7 @@ export default function App() {
               variant="ghost"
               size="sm"
               onClick={() => setShowDiagnostics(true)}
-              className="text-muted-foreground"
+              className="text-muted-foreground hover:text-accent"
               title="Diagnostics"
             >
               <Bug className="h-4 w-4" />
@@ -472,8 +471,8 @@ export default function App() {
           <QuizEditor quizId={ACTIVE_QUIZ_ID} onStartQuiz={handleStartQuiz} />
         )}
         {currentView === 'gameplay' && (
-          <QuizGameplay 
-            quizId={ACTIVE_QUIZ_ID} 
+          <QuizGameplay
+            quizId={ACTIVE_QUIZ_ID}
             onComplete={handleQuizComplete}
             onStepChange={handleQuizStepChange}
           />
@@ -484,7 +483,6 @@ export default function App() {
             wrongAnswers={wrongAnswers}
             onPlayAgain={handlePlayAgain}
             onReviewWrongAnswers={handleReviewWrongAnswers}
-            onBackToEditor={isAdmin ? handleBackToEditor : undefined}
           />
         )}
         {currentView === 'wrongAnswersReview' && (
@@ -496,10 +494,6 @@ export default function App() {
       </main>
 
       <BuildIdentityFooter />
-
-      {showProfileSetup && (
-        <ProfileSetup onComplete={handleProfileComplete} />
-      )}
 
       {showDiagnostics && (
         <DeploymentDiagnosticsPanel 

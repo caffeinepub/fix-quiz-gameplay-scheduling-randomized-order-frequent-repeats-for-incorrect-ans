@@ -3,32 +3,22 @@
   "projectStateVersion": 3,
   "summary": "New project",
   "architectural_notes": [],
-  "known_issues": [
-    "Regression: newer versions after v56 are 'ruined' per user; need rollback to v56"
-  ],
-  "isFixRequest": true,
+  "known_issues": [],
+  "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-restore-the-application-s-ui-styling-and-layout-to-match-version-56-by-removing-undoing-the-styling-layout-changes-introduced-in-later-versions-notably-version-58-ensuring-a-consistent-neutral-shadcn-tailwind-look-across-the-app-shell-and-quiz-related-screens-including-pregamequestioncountview-prequizsummaryview-and-quizresults",
-      "title": "Restore the application’s UI styling and layout to match Version 56 by removing/undoing the styling/layout changes introduced in later versions (notably Version 58+), ensuring a consistent neutral Shadcn/Tailwind look across the app shell and quiz-related screens (including PreGameQuestionCountView, PreQuizSummaryView, and QuizResults).",
+      "id": "feature-update-the-app-s-displayed-build-version-metadata-so-it-always-reflects-the-actual-build-do-not-hardcode-version-56-including-in-build-info-generation-and-in-the-deployment-diagnostics-ui",
+      "title": "Update the app’s displayed build/version metadata so it always reflects the actual build (do not hardcode version '56'), including in build info generation and in the Deployment Diagnostics UI.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-restore-version-56-header-navigation-behavior-so-that-the-play-and-edit-header-actions-are-visible-throughout-the-start-flow-and-non-game-views-and-are-hidden-only-while-the-user-is-actively-in-the-in-game-question-answering-screen-the-active-quiz-step",
-      "title": "Restore Version 56 header navigation behavior so that the “Play” and “Edit” header actions are visible throughout the start flow and non-game views, and are hidden only while the user is actively in the in-game question-answering screen (the active quiz step).",
+      "id": "feature-ensure-the-project-is-live-publish-ready-by-validating-and-documenting-runtime-backend-canister-configuration-via-env-json-and-make-the-live-readiness-state-unambiguous-when-env-json-is-missing-or-canister-id-backend-is-empty",
+      "title": "Ensure the project is live-publish ready by validating and documenting runtime backend canister configuration via /env.json, and make the live readiness state unambiguous when /env.json is missing or CANISTER_ID_BACKEND is empty.",
       "reqIds": [
         "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-update-the-build-version-identity-shown-in-the-ui-to-report-version-56-e-g-the-footer-build-version-and-any-diagnostics-build-info-so-the-published-build-is-clearly-labeled-as-v56",
-      "title": "Update the build/version identity shown in the UI to report Version 56 (e.g., the footer build version and any diagnostics build info), so the published build is clearly labeled as v56.",
-      "reqIds": [
-        "REQ-3"
       ],
       "version": 1
     }
@@ -36,12 +26,12 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Rollback deployment/build to Version 56 due to newer versions being ruined",
+      "summary": "Deploy the current build/live version (go live)",
       "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Rollback app behavior to match Version 56 and label build as v56",
+  "projectName": "Prepare current build for live publishing (runtime config + accurate build/version diagnostics)",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }
