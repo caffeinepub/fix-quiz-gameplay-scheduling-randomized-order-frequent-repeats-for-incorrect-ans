@@ -2,12 +2,11 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-app-s-displayed-build-version-metadata-so-it-always-reflects-the-actual-build-do-not-hardcode-version-56-including-in-build-info-generation-and-in-the-deployment-diagnostics-ui",
-      "featureTitle": "Update the app’s displayed build/version metadata so it always reflects the actual build (do not hardcode version '56'), including in build info generation and in the Deployment Diagnostics UI.",
+      "featureId": "feature-remove-the-in-app-software-update-update-available-pop-up-banner-so-it-is-never-shown-anywhere-in-the-app-while-keeping-all-other-ui-and-functionality-unchanged-this-includes-removing-the-pendingupdatebanner-rendering-from-all-app-entry-states-unauthenticated-view-actor-initialization-error-view-profile-setup-view-and-main-authenticated-view",
+      "featureTitle": "Remove the in-app \"Software update\"/\"Update Available\" pop-up/banner so it is never shown anywhere in the app, while keeping all other UI and functionality unchanged. This includes removing the PendingUpdateBanner rendering from all App entry states (unauthenticated view, actor initialization error view, profile setup view, and main authenticated view).",
       "files": [
-        "frontend/src/components/BuildIdentityFooter.tsx",
-        "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
-        "frontend/src/utils/buildStamp.ts"
+        "frontend/src/App.tsx",
+        "frontend/src/components/PendingUpdateBanner.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -20,32 +19,6 @@
       ],
       "testIds": [
         "REQ-1"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-ensure-the-project-is-live-publish-ready-by-validating-and-documenting-runtime-backend-canister-configuration-via-env-json-and-make-the-live-readiness-state-unambiguous-when-env-json-is-missing-or-canister-id-backend-is-empty",
-      "featureTitle": "Ensure the project is live-publish ready by validating and documenting runtime backend canister configuration via /env.json, and make the live readiness state unambiguous when /env.json is missing or CANISTER_ID_BACKEND is empty.",
-      "files": [
-        "frontend/index.html",
-        "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
-        "frontend/src/types/env.d.ts",
-        "frontend/src/utils/canisterIdResolution.ts",
-        "frontend/src/utils/formatPublishChecklist.ts",
-        "frontend/src/utils/liveReadiness.ts",
-        "frontend/src/utils/runtimeEnvStatus.ts"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-2"
       ],
       "confidence": "high"
     }

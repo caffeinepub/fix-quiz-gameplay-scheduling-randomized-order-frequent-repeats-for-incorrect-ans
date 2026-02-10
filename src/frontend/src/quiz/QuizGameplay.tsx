@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useGetAllQuestions, useGetAllBlockNames } from '../hooks/useQueries';
+import { useGetAllQuestions, useGetAllBlockNames, useIsAdmin } from '../hooks/useQueries';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { ArrowLeft, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Loader2, Edit } from 'lucide-react';
 import { createRandomSubset } from './randomSubset';
 import { AdaptiveScheduler } from './adaptiveScheduler';
 import { getQuestionsForBlock, getCombinedBlockLabel, getBlockCount } from './blockUtils';
 import PreGameQuestionCountView from './PreGameQuestionCountView';
 import PreQuizSummaryView from './PreQuizSummaryView';
+import QuizScoreBar from './QuizScoreBar';
 import type { Question } from '../backend';
 import type { WrongAnswerEntry } from './wrongAnswerTypes';
 import { useQuestionTranslation } from '../hooks/useQuestionTranslation';
@@ -20,11 +21,13 @@ interface QuizGameplayProps {
   quizId: string;
   onComplete: (correct: number, total: number, wrongAnswers: WrongAnswerEntry[]) => void;
   onStepChange?: (isActiveQuiz: boolean) => void;
+  onEditQuestions?: () => void;
 }
 
-export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizGameplayProps) {
+export default function QuizGameplay({ quizId, onComplete, onStepChange, onEditQuestions }: QuizGameplayProps) {
   const { data: allQuestions = [], isLoading: questionsLoading } = useGetAllQuestions(quizId);
   const { data: blockNamesData = [] } = useGetAllBlockNames(quizId);
+  const { data: isAdmin = false } = useIsAdmin();
 
   const [currentStep, setCurrentStep] = useState<QuizStep>('blockSelection');
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null);
@@ -183,10 +186,25 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
       <div className="max-w-4xl mx-auto p-6">
         <Card className="shadow-cyber">
           <CardHeader>
-            <CardTitle>Select Question Block</CardTitle>
-            <CardDescription>
-              Choose a block of 100 questions to practice
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Select Question Block</CardTitle>
+                <CardDescription>
+                  Choose a block of 100 questions to practice
+                </CardDescription>
+              </div>
+              {isAdmin && onEditQuestions && (
+                <Button
+                  onClick={onEditQuestions}
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit questions
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -254,7 +272,7 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
   const performance = scheduler?.getPerformance().get(currentQuestionId);
   const attemptNumber = performance ? performance.attempts + 1 : 1;
 
-  // Calculate current score
+  // Calculate current score and answered count
   const currentPerformance = scheduler?.getPerformance();
   let correctSoFar = 0;
   let answeredSoFar = 0;
@@ -271,7 +289,7 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="flex-1 overflow-y-auto pb-6">
+      <div className="flex-1 overflow-y-auto pb-20">
         <div className="max-w-3xl mx-auto px-4 pt-6">
           <div className="mb-4">
             <Button
@@ -285,7 +303,7 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
             </Button>
             <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
               <span>
-                Question {currentQuestionId + 1} of {sessionQuestions.length}
+                Answered {answeredSoFar} of {selectedQuestionCount}
               </span>
               {attemptNumber > 1 && (
                 <span className="text-xs">Attempt #{attemptNumber}</span>
@@ -370,9 +388,6 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
                   >
                     Next Question
                   </Button>
-                  <div className="text-center text-sm text-muted-foreground pt-2">
-                    Score: {correctSoFar} / {answeredSoFar} correct
-                  </div>
                 </div>
               )}
 
@@ -391,6 +406,8 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange }: QuizG
           </Card>
         </div>
       </div>
+      
+      <QuizScoreBar correct={correctSoFar} answered={answeredSoFar} />
     </div>
   );
 }

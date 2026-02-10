@@ -1,83 +1,71 @@
-// Publish checklist formatter
-// Generates plain-text checklist for publishing draft to live canister
+import { getActorConnectionInfoAsync } from './actorConnectionInfo';
+import type { BuildInfo } from './buildStamp';
 
-import type { BuildStamp } from './buildStamp';
-import type { ConnectionInfo } from './actorConnectionInfo';
-
-export interface PublishChecklistInput {
-  buildInfo: BuildStamp;
-  connectionInfo: ConnectionInfo;
-}
-
-/**
- * Formats publish checklist as plain text for clipboard/manual copy.
- * Includes current build metadata, resolved canister ID, and step-by-step publish instructions.
- */
-export function formatPublishChecklist(input: PublishChecklistInput): string {
+export async function formatPublishChecklist(buildInfo: BuildInfo): Promise<string> {
+  const connectionInfo = await getActorConnectionInfoAsync();
+  
   const lines: string[] = [];
-
-  // Header
-  lines.push('=== Publish to Live Canister - Checklist ===');
+  
+  lines.push('='.repeat(60));
+  lines.push('PUBLISH CHECKLIST');
+  lines.push('='.repeat(60));
   lines.push('');
-  lines.push('IMPORTANT: This app cannot publish itself. Publishing is done via the Caffeine editor.');
+  
+  lines.push('Current Build Information:');
+  lines.push(`  Version: ${buildInfo.version}`);
+  lines.push(`  Timestamp: ${buildInfo.timestamp}`);
+  lines.push(`  Deployment ID: ${buildInfo.deploymentId}`);
+  lines.push(`  Environment: ${buildInfo.environment}`);
   lines.push('');
-
-  // Current Build Info
-  lines.push('Current Build:');
-  lines.push(`  Version: ${input.buildInfo.version}`);
-  lines.push(`  Timestamp: ${input.buildInfo.timestamp}`);
-  lines.push(`  Deployment ID: ${input.buildInfo.deploymentId}`);
-  lines.push(`  Environment: ${input.buildInfo.environment}`);
-  lines.push('');
-
-  // Backend Canister Info
-  lines.push('Backend Canister Resolution:');
-  lines.push(`  Canister ID: ${input.connectionInfo.canisterId || '(not resolved)'}`);
-  lines.push(`  Source: ${input.connectionInfo.canisterIdSource}`);
-  lines.push(`  Network: ${input.connectionInfo.network}`);
-  lines.push(`  Host: ${input.connectionInfo.host}`);
-  if (input.connectionInfo.canisterIdResolutionError) {
-    lines.push(`  Resolution Error: ${input.connectionInfo.canisterIdResolutionError}`);
+  
+  lines.push('Backend Canister Configuration:');
+  if (connectionInfo.canisterId) {
+    lines.push(`  Resolved Canister ID: ${connectionInfo.canisterId}`);
+    lines.push(`  Resolution Method: ${connectionInfo.canisterIdSource}`);
+  } else {
+    lines.push('  Resolved Canister ID: (not resolved)');
+    if (connectionInfo.canisterIdResolutionError) {
+      lines.push(`  Error: ${connectionInfo.canisterIdResolutionError}`);
+    }
   }
   lines.push('');
-
-  // Publish Steps
-  lines.push('How to Publish Draft to Live:');
+  
+  lines.push('IMPORTANT: This application cannot self-publish.');
+  lines.push('You must publish it through the Caffeine editor.');
   lines.push('');
-  lines.push('1. Verify Prerequisites:');
-  lines.push('   • Check that Live Readiness shows "Ready" status in Deployment Diagnostics');
-  lines.push('   • Ensure all testing is complete on your draft version');
-  lines.push('   • Confirm backend canister ID is resolved correctly');
+  
+  lines.push('Runtime Configuration (env.json):');
+  lines.push('  Your /env.json file MUST contain a non-empty CANISTER_ID_BACKEND value.');
+  lines.push('  Example:');
+  lines.push('  {');
+  lines.push('    "CANISTER_ID_BACKEND": "your-backend-canister-id-here"');
+  lines.push('  }');
   lines.push('');
-  lines.push('2. Prepare Runtime Configuration (CRITICAL):');
-  lines.push('   • Your live deployment must include a file named /env.json in the frontend assets');
-  lines.push('   • The file must contain a NON-EMPTY CANISTER_ID_BACKEND value:');
-  lines.push('     {');
-  lines.push('       "CANISTER_ID_BACKEND": "your-live-backend-canister-id"');
-  lines.push('     }');
-  lines.push('   • This configuration is loaded into window.__ENV__ at runtime');
-  lines.push('   • Without a non-empty value, the frontend cannot connect to the backend');
+  
+  lines.push('Publishing Steps:');
+  lines.push('  1. Open the Caffeine editor');
+  lines.push('  2. Navigate to your project');
+  lines.push('  3. Click "Publish" or "Deploy to Live"');
+  lines.push('  4. Wait for the deployment to complete');
+  lines.push('  5. The editor will provide you with a live URL');
   lines.push('');
-  lines.push('3. Publish via Caffeine Editor:');
-  lines.push('   • Open your project in the Caffeine editor');
-  lines.push('   • Navigate to the "Live" tab');
-  lines.push('   • Click "Publish" to deploy your frontend assets to the live canister');
-  lines.push('   • Ensure /env.json is included in the deployment');
-  lines.push('   • Wait for the deployment to complete successfully');
+  
+  lines.push('Post-Publish Verification:');
+  lines.push('  1. Visit the live URL provided by the editor');
+  lines.push('  2. Check that the app loads without errors');
+  lines.push('  3. Verify that the backend connection works');
+  lines.push('  4. Test core functionality (login, data operations)');
+  lines.push('  5. Open browser DevTools and check for console errors');
   lines.push('');
-  lines.push('4. Post-Publish Verification:');
-  lines.push('   • Open your live URL in a browser');
-  lines.push('   • Open Deployment Diagnostics panel (click the bug icon)');
-  lines.push('   • Click "Run Backend Health Check" to verify connectivity');
-  lines.push('   • Verify the health check returns success');
-  lines.push('   • Click "Copy Live Verification Info" to capture deployment details');
-  lines.push('   • Verify Live Readiness shows "Ready" status');
-  lines.push('   • Test core application functionality');
+  
+  lines.push('Troubleshooting:');
+  lines.push('  - If the app shows "Configuration Error", check /env.json');
+  lines.push('  - If backend calls fail, verify the canister ID is correct');
+  lines.push('  - If you see CORS errors, ensure the backend allows the frontend origin');
+  lines.push('  - Use the Diagnostics panel (bug icon) for detailed connection info');
   lines.push('');
-
-  // Footer
-  lines.push(`Generated: ${new Date().toISOString()}`);
-  lines.push(`From: ${window.location.origin}${window.location.pathname}`);
-
+  
+  lines.push('='.repeat(60));
+  
   return lines.join('\n');
 }

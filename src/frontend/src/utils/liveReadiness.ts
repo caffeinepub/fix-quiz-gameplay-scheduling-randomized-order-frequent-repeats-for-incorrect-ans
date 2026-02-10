@@ -31,11 +31,12 @@ export function evaluateReadiness(
   if (!canisterId) {
     return {
       ready: false,
-      summary: 'Not ready - Backend canister ID not resolved',
+      summary: 'Not Ready - Backend canister ID not resolved',
       details: [
         'The backend canister ID could not be resolved.',
         canisterIdError || 'No canister ID available from any source.',
-        'To fix: Provide a non-empty CANISTER_ID_BACKEND in /env.json for runtime configuration, or set VITE_CANISTER_ID_BACKEND at build time.',
+        'Required: /env.json must contain a non-empty CANISTER_ID_BACKEND value.',
+        'Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }',
       ],
       error: canisterIdError,
     };
@@ -48,7 +49,7 @@ export function evaluateReadiness(
   if (healthCheckError) {
     return {
       ready: false,
-      summary: 'Not ready - Backend health check failed',
+      summary: 'Not Ready - Backend health check failed',
       details: [
         ...details,
         'The backend canister could not be reached or did not respond correctly.',

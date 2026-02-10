@@ -4,21 +4,13 @@
   "summary": "New project",
   "architectural_notes": [],
   "known_issues": [],
-  "isFixRequest": false,
+  "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-update-the-app-s-displayed-build-version-metadata-so-it-always-reflects-the-actual-build-do-not-hardcode-version-56-including-in-build-info-generation-and-in-the-deployment-diagnostics-ui",
-      "title": "Update the app’s displayed build/version metadata so it always reflects the actual build (do not hardcode version '56'), including in build info generation and in the Deployment Diagnostics UI.",
+      "id": "feature-remove-the-in-app-software-update-update-available-pop-up-banner-so-it-is-never-shown-anywhere-in-the-app-while-keeping-all-other-ui-and-functionality-unchanged-this-includes-removing-the-pendingupdatebanner-rendering-from-all-app-entry-states-unauthenticated-view-actor-initialization-error-view-profile-setup-view-and-main-authenticated-view",
+      "title": "Remove the in-app \"Software update\"/\"Update Available\" pop-up/banner so it is never shown anywhere in the app, while keeping all other UI and functionality unchanged. This includes removing the PendingUpdateBanner rendering from all App entry states (unauthenticated view, actor initialization error view, profile setup view, and main authenticated view).",
       "reqIds": [
         "REQ-1"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-ensure-the-project-is-live-publish-ready-by-validating-and-documenting-runtime-backend-canister-configuration-via-env-json-and-make-the-live-readiness-state-unambiguous-when-env-json-is-missing-or-canister-id-backend-is-empty",
-      "title": "Ensure the project is live-publish ready by validating and documenting runtime backend canister configuration via /env.json, and make the live readiness state unambiguous when /env.json is missing or CANISTER_ID_BACKEND is empty.",
-      "reqIds": [
-        "REQ-2"
       ],
       "version": 1
     }
@@ -26,12 +18,12 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Deploy the current build/live version (go live)",
+      "summary": "Remove the \"Software update\" pop-up window from the app (keep everything else the same)",
       "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Prepare current build for live publishing (runtime config + accurate build/version diagnostics)",
+  "projectName": "Remove the “Software update” update-available pop-up from the app",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

@@ -1,53 +1,34 @@
 {
   "kind": "build_request",
-  "title": "Prepare current build for live publishing (runtime config + accurate build/version diagnostics)",
-  "priority": "high",
+  "title": "Remove the “Software update” update-available pop-up from the app",
+  "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Update the app’s displayed build/version metadata so it always reflects the actual build (do not hardcode version '56'), including in build info generation and in the Deployment Diagnostics UI.",
+      "text": "Remove the in-app \"Software update\"/\"Update Available\" pop-up/banner so it is never shown anywhere in the app, while keeping all other UI and functionality unchanged. This includes removing the PendingUpdateBanner rendering from all App entry states (unauthenticated view, actor initialization error view, profile setup view, and main authenticated view).",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-6"
         ],
         "quotes": [
-          "go live with this"
+          "keep all other the same but remove \"Software update\" pop up window from app"
         ]
       },
       "acceptanceCriteria": [
-        "In Deployment Diagnostics, the displayed version is sourced from build metadata (e.g., VITE_APP_VERSION) and is not hardcoded to '56'.",
-        "The build info utility does not fall back to a fixed version string; if no build-time version is provided, it uses a clearly dynamic fallback (e.g., 'dev' or similar) rather than a specific historic version number.",
-        "After rebuilding, the Diagnostics panel and any footer/build info surfaces show consistent version values."
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "text": "Ensure the project is live-publish ready by validating and documenting runtime backend canister configuration via /env.json, and make the live readiness state unambiguous when /env.json is missing or CANISTER_ID_BACKEND is empty.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-4"
-        ],
-        "quotes": [
-          "go live with this"
-        ]
-      },
-      "acceptanceCriteria": [
-        "If frontend/public/env.json is missing in a deployed environment, the app clearly indicates the backend canister ID is not resolved and Live Readiness shows 'Not ready'.",
-        "If frontend/public/env.json exists but CANISTER_ID_BACKEND is an empty string, the app treats it as not configured and Live Readiness shows 'Not ready'.",
-        "Deployment Diagnostics 'Publish to Live Canister' section instructions remain accurate and explicitly mention that /env.json must include a non-empty CANISTER_ID_BACKEND value for live deployments.",
-        "The 'Copy Publish Checklist' output includes the resolved canister ID when available, and clearly shows '(not resolved)' when not available."
+        "No update-related pop-up/banner is displayed on any screen/state of the app (unauthenticated, authenticated, profile setup, or connection error states).",
+        "All other app behavior remains unchanged (login, quiz flows, diagnostics, etc.).",
+        "The frontend builds successfully with no unused-import or lint/type errors related to PendingUpdateBanner."
       ]
     }
   ],
   "constraints": [
-    "Do not edit files under frontend/src/components/ui (shadcn UI components are read-only).",
-    "Do not edit immutable frontend hook files: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useInternetIdentity.tsx, frontend/src/hooks/useActor.ts, frontend/src/main.tsx."
+    "Do not modify any other UI, copy, flows, or backend behavior beyond removing the software-update pop-up/banner.",
+    "Do not edit files under frontend/src/components/ui (read-only)."
   ],
   "nonGoals": [
-    "Performing the actual live publish/deployment from within the app (publishing is done via the Caffeine editor).",
-    "Changing backend canister logic or data schema as part of the go-live task."
+    "Adding a different update notification mechanism.",
+    "Changing service worker/cache refresh behavior beyond removing the UI pop-up/banner."
   ],
   "imageRequirements": {
     "required": [],

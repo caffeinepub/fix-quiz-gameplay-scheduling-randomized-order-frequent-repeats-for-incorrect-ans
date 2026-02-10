@@ -9,10 +9,47 @@ export interface CanisterIdResolution {
 }
 
 /**
+ * Attempts to load canister ID from generated declarations.
+ * This is an async operation that tries to fetch canister_ids.json at runtime.
+ */
+async function tryLoadCanisterIdFromDeclarations(): Promise<string | null> {
+  try {
+    // Try to fetch canister_ids.json at runtime
+    // This file may not exist, so we handle errors gracefully
+    const response = await fetch('/canister_ids.json').catch(() => null);
+    
+    if (!response || !response.ok) {
+      return null;
+    }
+    
+    const canisterIds = await response.json().catch(() => null);
+    
+    if (!canisterIds || typeof canisterIds !== 'object') {
+      return null;
+    }
+    
+    // Check for backend canister ID in various possible keys
+    const backendId = 
+      canisterIds.backend?.ic ||
+      canisterIds.backend?.local ||
+      canisterIds.backend;
+    
+    if (backendId && typeof backendId === 'string' && backendId.trim()) {
+      return backendId.trim();
+    }
+    
+    return null;
+  } catch (e) {
+    // Declarations not available or don't contain canister ID
+    return null;
+  }
+}
+
+/**
  * Resolves the backend canister ID from multiple sources in priority order:
  * 1. Vite build-time environment variables (import.meta.env)
  * 2. Runtime environment (window.__ENV__)
- * 3. Generated backend declarations
+ * 3. Generated backend declarations (canister_ids.json)
  * 4. URL-based fallback (only for local development)
  * 
  * Returns detailed resolution information including which source was used.
@@ -50,17 +87,9 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
     // window.__ENV__ not available
   }
 
-  // 3. Try generated backend declarations
-  sourcesAttempted.push('declarations');
-  try {
-    // Attempt to read canister ID from declarations if available
-    // Note: This is a synchronous check; the actual import happens elsewhere
-    // We're checking if the declarations module exports a canisterId
-    // This is a placeholder - in practice, declarations don't export canisterId directly
-    // but this documents the intended resolution order
-  } catch (e) {
-    // Declarations not available or don't contain canister ID
-  }
+  // 3. Declarations fallback is async, so we can't use it in sync resolution
+  // Mark it as attempted but note it requires async resolution
+  sourcesAttempted.push('declarations (requires async)');
 
   // 4. URL-based fallback (only safe for local development)
   sourcesAttempted.push('url-fallback');
@@ -76,7 +105,7 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
         canisterId: null,
         source: 'none',
         sourcesAttempted,
-        error: 'Backend canister ID not found in environment variables (required for local development)',
+        error: 'Backend canister ID not found in environment variables (required for local development). Please ensure /env.json contains a non-empty CANISTER_ID_BACKEND value, or set VITE_CANISTER_ID_BACKEND at build time.',
       };
     }
   }
@@ -89,7 +118,7 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
       canisterId: null,
       source: 'none',
       sourcesAttempted,
-      error: 'Backend canister ID not found in deployment configuration. The frontend canister ID (URL subdomain) cannot be used as the backend canister ID. Please ensure env.json contains a non-empty CANISTER_ID_BACKEND or build-time variables include VITE_CANISTER_ID_BACKEND.',
+      error: 'Backend canister ID not found in deployment configuration. The frontend canister ID (URL subdomain) cannot be used as the backend canister ID. Please ensure /env.json contains a non-empty CANISTER_ID_BACKEND value. Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }',
     };
   }
 
@@ -98,7 +127,39 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
     canisterId: null,
     source: 'none',
     sourcesAttempted,
-    error: 'Backend canister ID not found. Please ensure the canister is deployed and environment is configured correctly with a non-empty value (via import.meta.env or window.__ENV__).',
+    error: 'Backend canister ID not found. Please ensure /env.json contains a non-empty CANISTER_ID_BACKEND value. Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }',
+  };
+}
+
+/**
+ * Async version that tries declarations fallback before giving up.
+ * Use this when you can afford the async operation.
+ */
+export async function resolveBackendCanisterIdAsync(): Promise<CanisterIdResolution> {
+  // First try synchronous sources
+  const syncResolution = resolveBackendCanisterId();
+  
+  // If we found a canister ID, return it
+  if (syncResolution.canisterId) {
+    return syncResolution;
+  }
+  
+  // Try declarations fallback
+  const sourcesAttempted = [...syncResolution.sourcesAttempted];
+  const declarationsCanisterId = await tryLoadCanisterIdFromDeclarations();
+  
+  if (declarationsCanisterId) {
+    return {
+      canisterId: declarationsCanisterId,
+      source: 'declarations',
+      sourcesAttempted,
+    };
+  }
+  
+  // Still no canister ID found
+  return {
+    ...syncResolution,
+    sourcesAttempted,
   };
 }
 
@@ -108,6 +169,21 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
  */
 export function getBackendCanisterIdOrThrow(): string {
   const resolution = resolveBackendCanisterId();
+  
+  if (!resolution.canisterId) {
+    const errorMessage = resolution.error || 'Backend canister ID not found';
+    const sourcesMsg = `Attempted sources: ${resolution.sourcesAttempted.join(', ')}`;
+    throw new Error(`${errorMessage}\n${sourcesMsg}`);
+  }
+  
+  return resolution.canisterId;
+}
+
+/**
+ * Async version that tries declarations fallback before throwing.
+ */
+export async function getBackendCanisterIdOrThrowAsync(): Promise<string> {
+  const resolution = await resolveBackendCanisterIdAsync();
   
   if (!resolution.canisterId) {
     const errorMessage = resolution.error || 'Backend canister ID not found';

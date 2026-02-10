@@ -1,4 +1,4 @@
-import { resolveBackendCanisterId, type CanisterIdResolution } from './canisterIdResolution';
+import { resolveBackendCanisterId, resolveBackendCanisterIdAsync, type CanisterIdResolution } from './canisterIdResolution';
 
 export interface ConnectionInfo {
   host: string;
@@ -20,6 +20,35 @@ function getAgentHost(): string {
   return 'https://icp-api.io';
 }
 
+/**
+ * Gets actor connection info asynchronously, including declarations fallback.
+ */
+export async function getActorConnectionInfoAsync(): Promise<ConnectionInfo> {
+  const host = getAgentHost();
+  const resolution = await resolveBackendCanisterIdAsync();
+  
+  // Determine network name from host
+  let network = 'unknown';
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    network = 'local';
+  } else if (host.includes('icp-api.io') || host.includes('ic0.app') || host.includes('icp0.io')) {
+    network = 'mainnet';
+  }
+
+  return {
+    host,
+    canisterId: resolution.canisterId,
+    network,
+    canisterIdSource: resolution.source,
+    canisterIdSourcesAttempted: resolution.sourcesAttempted,
+    canisterIdResolutionError: resolution.error,
+  };
+}
+
+/**
+ * Synchronous version for immediate use (doesn't include declarations fallback).
+ * Use getActorConnectionInfoAsync() when you can afford the async operation.
+ */
 export function getActorConnectionInfo(): ConnectionInfo {
   const host = getAgentHost();
   const resolution = resolveBackendCanisterId();

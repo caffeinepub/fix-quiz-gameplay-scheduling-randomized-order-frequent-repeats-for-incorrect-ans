@@ -1,79 +1,77 @@
-// Share live verification info formatter
-// Generates plain-text summary for clipboard sharing
-
-import type { BuildStamp } from './buildStamp';
-import type { ConnectionInfo } from './actorConnectionInfo';
+import { getActorConnectionInfoAsync } from './actorConnectionInfo';
+import type { BuildInfo } from './buildStamp';
 import type { HealthCheckResult } from '../backend';
 
-export interface VerificationInfoInput {
-  buildInfo: BuildStamp;
-  connectionInfo: ConnectionInfo;
-  healthCheckResult: HealthCheckResult | null;
-  healthCheckError: string | null;
-}
-
-/**
- * Formats verification info as plain text for sharing.
- * Includes URL, build metadata, canister ID, and health check status.
- */
-export function formatVerificationInfo(input: VerificationInfoInput): string {
+export async function shareLiveVerificationInfo(
+  buildInfo: BuildInfo,
+  healthCheckResult: HealthCheckResult | null = null,
+  healthCheckError: string | null = null
+): Promise<string> {
+  const connectionInfo = await getActorConnectionInfoAsync();
+  
   const lines: string[] = [];
-
-  // Header
-  lines.push('=== Live Verification Info ===');
+  
+  lines.push('='.repeat(60));
+  lines.push('LIVE VERIFICATION INFO');
+  lines.push('='.repeat(60));
   lines.push('');
-
-  // Location
+  
   lines.push('Live URL:');
-  lines.push(`  ${window.location.origin}${window.location.pathname}`);
-  if (window.location.hash) {
-    lines.push(`  Hash: ${window.location.hash}`);
-  }
+  lines.push(`  ${window.location.href}`);
   lines.push('');
-
-  // Build Metadata
-  lines.push('Build Metadata:');
-  lines.push(`  Version: ${input.buildInfo.version}`);
-  lines.push(`  Timestamp: ${input.buildInfo.timestamp}`);
-  lines.push(`  Environment: ${input.buildInfo.environment}`);
-  lines.push(`  Deployment ID: ${input.buildInfo.deploymentId}`);
+  
+  lines.push('Build Information:');
+  lines.push(`  Version: ${buildInfo.version}`);
+  lines.push(`  Timestamp: ${buildInfo.timestamp}`);
+  lines.push(`  Deployment ID: ${buildInfo.deploymentId}`);
+  lines.push(`  Environment: ${buildInfo.environment}`);
   lines.push('');
-
-  // Backend Canister Resolution
-  lines.push('Backend Canister Resolution:');
-  lines.push(`  Canister ID: ${input.connectionInfo.canisterId || '(not resolved)'}`);
-  lines.push(`  Source: ${input.connectionInfo.canisterIdSource}`);
-  lines.push(`  Sources Attempted: ${input.connectionInfo.canisterIdSourcesAttempted.join(', ')}`);
-  if (input.connectionInfo.canisterIdResolutionError) {
-    lines.push(`  Resolution Error: ${input.connectionInfo.canisterIdResolutionError}`);
-  }
-  lines.push('');
-
-  // Network/Host
-  lines.push('Network Configuration:');
-  lines.push(`  Network: ${input.connectionInfo.network}`);
-  lines.push(`  Host: ${input.connectionInfo.host}`);
-  lines.push('');
-
-  // Health Check Status/Result
-  lines.push('Health Check Status:');
-  if (input.healthCheckResult) {
-    lines.push('  Status: SUCCESS');
-    lines.push(`  Backend Version: ${input.healthCheckResult.backendVersion.toString()}`);
-    lines.push(`  System Time: ${new Date(Number(input.healthCheckResult.systemTime) / 1_000_000).toISOString()}`);
-    lines.push('  Result: Backend is reachable and responding correctly');
-  } else if (input.healthCheckError) {
-    lines.push('  Status: FAILED');
-    lines.push(`  Error: ${input.healthCheckError}`);
-    lines.push('  Result: Backend connection failed - check canister ID and network configuration');
+  
+  lines.push('Backend Canister:');
+  if (connectionInfo.canisterId) {
+    lines.push(`  Canister ID: ${connectionInfo.canisterId}`);
+    lines.push(`  Resolution Method: ${connectionInfo.canisterIdSource}`);
   } else {
-    lines.push('  Status: Not performed');
-    lines.push('  Result: Health check has not been run yet');
+    lines.push('  Canister ID: (not resolved)');
+    if (connectionInfo.canisterIdResolutionError) {
+      lines.push(`  Error: ${connectionInfo.canisterIdResolutionError}`);
+    }
   }
   lines.push('');
-
-  // Footer
-  lines.push(`Generated: ${new Date().toISOString()}`);
-
+  
+  lines.push('Network Configuration:');
+  lines.push(`  Network: ${connectionInfo.network}`);
+  lines.push(`  Host: ${connectionInfo.host}`);
+  lines.push('');
+  
+  lines.push('Health Check:');
+  if (healthCheckResult) {
+    lines.push('  Status: Success');
+    lines.push(`  Backend Version: ${healthCheckResult.backendVersion}`);
+    lines.push(`  System Time: ${new Date(Number(healthCheckResult.systemTime) / 1_000_000).toISOString()}`);
+  } else if (healthCheckError) {
+    lines.push('  Status: Failed');
+    lines.push(`  Error: ${healthCheckError}`);
+  } else {
+    lines.push('  Status: Not checked');
+  }
+  lines.push('');
+  
+  lines.push('Overall Status:');
+  if (connectionInfo.canisterId && healthCheckResult) {
+    lines.push('  ✓ Ready');
+  } else {
+    lines.push('  ✗ Not Ready');
+    if (!connectionInfo.canisterId) {
+      lines.push('  - Backend canister ID not configured');
+    }
+    if (!healthCheckResult && healthCheckError) {
+      lines.push('  - Backend health check failed');
+    }
+  }
+  lines.push('');
+  
+  lines.push('='.repeat(60));
+  
   return lines.join('\n');
 }

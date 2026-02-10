@@ -1,8 +1,12 @@
-<html lang='en'>
+<html lang='en' class='dark'>
     <head>
         <meta charset='UTF-8' />
         <meta name='viewport' content='width=device-width, initial-scale=1.0' />
         <title>TN intelligence Quiz</title>
+        <script>
+            // Force dark mode before any rendering
+            document.documentElement.classList.add('dark');
+        </script>
         <script>
             // Pre-bootstrap script: Load runtime environment from /env.json
             // This runs before the React app starts, ensuring window.__ENV__ is available

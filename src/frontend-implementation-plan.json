@@ -1,83 +1,26 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Live publish readiness: dynamic build version + unambiguous runtime env.json diagnostics",
+  "title": "Remove in-app software update / update-available banner UI",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Replace all hardcoded build/version displays with build-time metadata (with dynamic non-historic fallback) and ensure consistency across diagnostics and footer.",
+      "summary": "Ensure the in-app “Software update” / “Update Available” banner is never displayed in any app state, without changing any other UI or behavior.",
       "acceptanceCriteria": [
-        "In Deployment Diagnostics, the displayed version is sourced from build metadata (e.g., VITE_APP_VERSION) and is not hardcoded to '56'.",
-        "The build info utility does not fall back to a fixed version string; if no build-time version is provided, it uses a clearly dynamic fallback (e.g., 'dev' or similar) rather than a specific historic version number.",
-        "After rebuilding, the Diagnostics panel and any footer/build info surfaces show consistent version values."
+        "No update-related pop-up/banner is displayed on any screen/state of the app (unauthenticated, authenticated, profile setup, or connection error states).",
+        "All other app behavior remains unchanged (login, quiz flows, diagnostics, etc.).",
+        "The frontend builds successfully with no unused-import or lint/type errors related to PendingUpdateBanner."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/buildStamp.ts",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Update build info generation so `version` is sourced from build-time metadata (e.g., `import.meta.env.VITE_APP_VERSION`) and never falls back to a fixed historic number; use a clearly dynamic fallback such as 'dev' (or similar) when not provided. Ensure trimming/empty-string handling is robust."
+          "description": "Remove PendingUpdateBanner import and remove its rendering from all App entry states (unauthenticated view, actor initialization error view, profile setup view, main authenticated view) while leaving all other logic/UI untouched."
         },
         {
-          "path": "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "path": "frontend/src/components/PendingUpdateBanner.tsx",
           "operation": "modify",
-          "description": "Replace the hardcoded diagnostics header version display with `buildInfo.version` from `getBuildInfo()` so the Deployment Diagnostics UI always reflects the actual build metadata."
-        },
-        {
-          "path": "frontend/src/components/BuildIdentityFooter.tsx",
-          "operation": "modify",
-          "description": "Replace the hardcoded footer version label (currently `v56`) with the runtime `buildInfo.version` value from `getBuildInfo()` to keep all build/version surfaces consistent."
-        },
-        {
-          "path": "frontend/src/utils/shareLiveVerificationInfo.ts",
-          "operation": "modify",
-          "description": "Confirm the shared verification output uses `buildInfo.version` (and no fixed version string) so shared diagnostics reflect the actual build metadata consistently."
-        }
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "summary": "Make runtime backend canister configuration via /env.json explicit and live-readiness unambiguous when /env.json is missing or CANISTER_ID_BACKEND is empty, including accurate diagnostics instructions and checklist output.",
-      "acceptanceCriteria": [
-        "If frontend/public/env.json is missing in a deployed environment, the app clearly indicates the backend canister ID is not resolved and Live Readiness shows 'Not ready'.",
-        "If frontend/public/env.json exists but CANISTER_ID_BACKEND is an empty string, the app treats it as not configured and Live Readiness shows 'Not ready'.",
-        "Deployment Diagnostics 'Publish to Live Canister' section instructions remain accurate and explicitly mention that /env.json must include a non-empty CANISTER_ID_BACKEND value for live deployments.",
-        "The 'Copy Publish Checklist' output includes the resolved canister ID when available, and clearly shows '(not resolved)' when not available."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/index.html",
-          "operation": "modify",
-          "description": "Enhance the pre-bootstrap /env.json loader to record an explicit runtime status (e.g., 'loaded', 'missing/unreachable', 'invalid') alongside `window.__ENV__` so the app can distinguish a missing/unreachable /env.json from an empty config object. Keep behavior safe for production (no secrets) and preserve existing cache-busting behavior."
-        },
-        {
-          "path": "frontend/src/types/env.d.ts",
-          "operation": "modify",
-          "description": "Extend the `window.__ENV__` type declarations to include the new runtime status marker(s) added in index.html (and keep CANISTER_ID_BACKEND typed as optional/possibly empty)."
-        },
-        {
-          "path": "frontend/src/utils/runtimeEnvStatus.ts",
-          "operation": "modify",
-          "description": "Update runtime env inspection to (1) treat empty-string/whitespace CANISTER_ID_BACKEND as not configured, and (2) use the runtime status marker from index.html to clearly report when /env.json is missing/unreachable vs present-but-misconfigured. Ensure messages and troubleshooting steps are explicit for both failure modes."
-        },
-        {
-          "path": "frontend/src/utils/canisterIdResolution.ts",
-          "operation": "modify",
-          "description": "Harden runtime canister ID resolution so `window.__ENV__.CANISTER_ID_BACKEND` is only accepted when it is a non-empty, trimmed string; empty string should be treated as not configured and continue to result in a non-resolved canister ID."
-        },
-        {
-          "path": "frontend/src/utils/liveReadiness.ts",
-          "operation": "modify",
-          "description": "Adjust readiness details for the 'canister ID not resolved' state to explicitly state that live deployments require a non-empty CANISTER_ID_BACKEND in /env.json (and/or build-time canister ID), keeping the overall result 'Not ready' when missing/unset."
-        },
-        {
-          "path": "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
-          "operation": "modify",
-          "description": "Update the 'Publish to Live Canister' instructions to explicitly require that /env.json includes a non-empty CANISTER_ID_BACKEND value for live deployments. Also ensure the 'Runtime Configuration Issue' messaging surfaces the improved runtimeEnvStatus distinction (missing/unreachable vs empty)."
-        },
-        {
-          "path": "frontend/src/utils/formatPublishChecklist.ts",
-          "operation": "modify",
-          "description": "Update the publish checklist text to explicitly state that /env.json must include a non-empty CANISTER_ID_BACKEND for live deployments, and ensure the checklist clearly includes the resolved canister ID when available or '(not resolved)' when not available (keeping output consistent with Deployment Diagnostics)."
+          "description": "Disable the update banner UI so it never renders (e.g., return null) and remove any now-unused imports/logic inside the component to prevent lint/type errors, without changing any other app flows."
         }
       ]
     }

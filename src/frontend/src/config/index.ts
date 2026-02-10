@@ -1,6 +1,6 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import type { backendInterface } from '../backend';
-import { getBackendCanisterIdOrThrow } from '../utils/canisterIdResolution';
+import { getBackendCanisterIdOrThrowAsync, resolveBackendCanisterIdAsync } from '../utils/canisterIdResolution';
 
 // Get agent host based on environment
 function getAgentHost(): string {
@@ -43,8 +43,8 @@ async function loadIdlFactory(): Promise<any> {
 }
 
 export async function createActorWithConfig(options?: ActorOptions): Promise<backendInterface> {
-  // Use the shared resolver which provides clear error messages
-  const canisterId = getBackendCanisterIdOrThrow();
+  // Use the async resolver which includes declarations fallback
+  const canisterId = await getBackendCanisterIdOrThrowAsync();
   const host = options?.agentOptions?.host || getAgentHost();
   const idlFactory = await loadIdlFactory();
 
@@ -73,9 +73,9 @@ export async function createActorWithConfig(options?: ActorOptions): Promise<bac
 // Alias for convenience
 export const createActor = createActorWithConfig;
 
-export function getConnectionInfo(): { host: string; canisterId: string | null } {
+export async function getConnectionInfo(): Promise<{ host: string; canisterId: string | null }> {
   try {
-    const canisterId = getBackendCanisterIdOrThrow();
+    const canisterId = await getBackendCanisterIdOrThrowAsync();
     const host = getAgentHost();
     return { host, canisterId };
   } catch (e) {

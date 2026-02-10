@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { diagnostics } from '../utils/deploymentDiagnostics';
 import { getBuildInfo } from '../utils/buildStamp';
-import { getActorConnectionInfo } from '../utils/actorConnectionInfo';
+import { getActorConnectionInfo, getActorConnectionInfoAsync } from '../utils/actorConnectionInfo';
 import { refreshToLatestBuild } from '../utils/refreshToLatestBuild';
 import { evaluateReadiness } from '../utils/liveReadiness';
 import { inspectRuntimeEnv, getRuntimeEnvStatusSync } from '../utils/runtimeEnvStatus';
-import { formatVerificationInfo } from '../utils/shareLiveVerificationInfo';
+import { shareLiveVerificationInfo } from '../utils/shareLiveVerificationInfo';
 import { formatPublishChecklist } from '../utils/formatPublishChecklist';
 import { createActorWithConfig } from '../config';
+import { detectStoppedCanister, formatStoppedCanisterMessage } from '../utils/stoppedCanisterDetection';
 import type { HealthCheckResult } from '../backend';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -32,9 +33,14 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
   const [shareFallbackText, setShareFallbackText] = useState<string | null>(null);
   const [publishChecklistError, setPublishChecklistError] = useState<string | null>(null);
   const [publishChecklistFallbackText, setPublishChecklistFallbackText] = useState<string | null>(null);
+  const [connectionInfo, setConnectionInfo] = useState(getActorConnectionInfo());
   const buildInfo = getBuildInfo();
-  const connectionInfo = getActorConnectionInfo();
   const publishSectionRef = useRef<HTMLDivElement>(null);
+
+  // Load async connection info on mount
+  useEffect(() => {
+    getActorConnectionInfoAsync().then(setConnectionInfo);
+  }, []);
 
   // Auto-run health check on mount
   useEffect(() => {
@@ -102,12 +108,26 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
       setHealthCheckResult(result);
     } catch (error: any) {
       setHealthCheckStatus('error');
-      setHealthCheckError(error.message || 'Unknown error occurred');
-      diagnostics.captureError(
-        error,
-        'DeploymentDiagnosticsPanel - Backend health check failed',
-        'runtime'
-      );
+      const stoppedInfo = detectStoppedCanister(error);
+      
+      if (stoppedInfo.isStopped) {
+        const stoppedMessage = formatStoppedCanisterMessage(stoppedInfo);
+        setHealthCheckError(stoppedMessage);
+        diagnostics.captureError(
+          error,
+          'DeploymentDiagnosticsPanel - Backend health check failed (canister stopped)',
+          'runtime',
+          'canisterStopped',
+          stoppedInfo.canisterId || undefined
+        );
+      } else {
+        setHealthCheckError(error.message || 'Unknown error occurred');
+        diagnostics.captureError(
+          error,
+          'DeploymentDiagnosticsPanel - Backend health check failed',
+          'runtime'
+        );
+      }
     }
   };
 
@@ -124,21 +144,29 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
     setShareError(null);
     setShareFallbackText(null);
 
-    const verificationText = formatVerificationInfo({
-      buildInfo,
-      connectionInfo,
-      healthCheckResult,
-      healthCheckError,
-    });
-
     try {
+      const verificationText = await shareLiveVerificationInfo(
+        buildInfo,
+        healthCheckResult,
+        healthCheckError
+      );
+
       await navigator.clipboard.writeText(verificationText);
       // Success - could show a toast here
       alert('Live verification info copied to clipboard!');
     } catch (error: any) {
-      // Clipboard write failed - show fallback
-      setShareError('Could not copy to clipboard. Please copy the text below manually:');
-      setShareFallbackText(verificationText);
+      // Either generation or clipboard write failed
+      try {
+        const verificationText = await shareLiveVerificationInfo(
+          buildInfo,
+          healthCheckResult,
+          healthCheckError
+        );
+        setShareError('Could not copy to clipboard. Please copy the text below manually:');
+        setShareFallbackText(verificationText);
+      } catch (genError: any) {
+        setShareError('Failed to generate verification info: ' + genError.message);
+      }
     }
   };
 
@@ -146,18 +174,19 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
     setPublishChecklistError(null);
     setPublishChecklistFallbackText(null);
 
-    const checklistText = formatPublishChecklist({
-      buildInfo,
-      connectionInfo,
-    });
-
     try {
+      const checklistText = await formatPublishChecklist(buildInfo);
       await navigator.clipboard.writeText(checklistText);
       alert('Publish checklist copied to clipboard!');
     } catch (error: any) {
-      // Clipboard write failed - show fallback
-      setPublishChecklistError('Could not copy to clipboard. Please copy the text below manually:');
-      setPublishChecklistFallbackText(checklistText);
+      // Either generation or clipboard write failed
+      try {
+        const checklistText = await formatPublishChecklist(buildInfo);
+        setPublishChecklistError('Could not copy to clipboard. Please copy the text below manually:');
+        setPublishChecklistFallbackText(checklistText);
+      } catch (genError: any) {
+        setPublishChecklistError('Failed to generate checklist: ' + genError.message);
+      }
     }
   };
 
@@ -258,223 +287,203 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
               <Download className="h-4 w-4 mr-2" />
               Download Report
             </Button>
-            <Button variant="outline" size="sm" onClick={handleClear} disabled={errors.length === 0}>
+            <Button variant="outline" size="sm" onClick={handleClear}>
               <Trash2 className="h-4 w-4 mr-2" />
               Clear Errors
             </Button>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {errors.length} error{errors.length !== 1 ? 's' : ''}
-              </span>
-            </div>
           </div>
 
-          {/* Live Readiness Section */}
-          <div className="mb-4">
-            <Alert className={readiness.ready ? 'border-success bg-success/10' : 'border-destructive bg-destructive/10'}>
-              {readiness.ready ? (
-                <CheckCircle className="h-4 w-4 text-success" />
-              ) : (
-                <XCircle className="h-4 w-4 text-destructive" />
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-6">
+              {/* Live Readiness Section */}
+              <div>
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  {readiness.ready ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-destructive" />
+                  )}
+                  Live Readiness
+                </h3>
+                <Alert variant={readiness.ready ? 'default' : 'destructive'}>
+                  <AlertTitle>{readiness.summary}</AlertTitle>
+                  <AlertDescription className="mt-2">
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      {readiness.details.map((detail, idx) => (
+                        <li key={idx}>{detail}</li>
+                      ))}
+                    </ul>
+                    {readiness.healthCheckResult && (
+                      <div className="mt-3 text-xs font-mono bg-muted p-2 rounded">
+                        <div>Backend Version: {readiness.healthCheckResult.backendVersion}</div>
+                        <div>System Time: {readiness.healthCheckResult.systemTime}</div>
+                      </div>
+                    )}
+                    {!connectionInfo.canisterId && (
+                      <div className="mt-3 p-3 bg-destructive/10 rounded border border-destructive/20">
+                        <div className="font-semibold text-sm mb-2">Required Configuration:</div>
+                        <div className="text-xs mb-2">
+                          Your /env.json file must contain a non-empty CANISTER_ID_BACKEND value:
+                        </div>
+                        <pre className="text-xs bg-background p-2 rounded border overflow-x-auto">
+{`{
+  "CANISTER_ID_BACKEND": "your-backend-canister-id"
+}`}
+                        </pre>
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              </div>
+
+              {/* Runtime Configuration Section */}
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Runtime Configuration</h3>
+                <Alert>
+                  <AlertDescription>
+                    <div className="text-sm space-y-2">
+                      <div>{runtimeEnvMessage}</div>
+                      {!connectionInfo.canisterId && (
+                        <div className="mt-2 p-2 bg-muted rounded">
+                          <div className="font-semibold mb-1">Troubleshooting:</div>
+                          <ul className="list-disc list-inside space-y-1 text-xs">
+                            <li>Ensure /env.json exists in your deployed frontend assets</li>
+                            <li>Verify /env.json contains a non-empty CANISTER_ID_BACKEND value</li>
+                            <li>Check browser network tab to confirm /env.json is accessible</li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              </div>
+
+              {/* Publish Guidance Section */}
+              <div ref={publishSectionRef}>
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <Rocket className="h-5 w-5 text-primary" />
+                  Publish to Live Canister
+                </h3>
+                <Alert>
+                  <AlertDescription>
+                    <div className="text-sm space-y-3">
+                      <p>
+                        This application cannot self-publish. To deploy to a live canister on the Internet Computer:
+                      </p>
+                      <ol className="list-decimal list-inside space-y-2 ml-2">
+                        <li>Copy the publish checklist using the button below</li>
+                        <li>Return to the Caffeine editor</li>
+                        <li>Follow the checklist instructions to publish via the editor</li>
+                        <li>After publishing, update /env.json with your backend canister ID</li>
+                      </ol>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyPublishChecklist}
+                        className="w-full"
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Publish Checklist
+                      </Button>
+                      {publishChecklistError && (
+                        <div className="mt-2">
+                          <div className="text-xs text-destructive mb-1">{publishChecklistError}</div>
+                          {publishChecklistFallbackText && (
+                            <Textarea
+                              value={publishChecklistFallbackText}
+                              readOnly
+                              className="text-xs font-mono h-32"
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              </div>
+
+              {/* Share Verification Info Fallback */}
+              {shareError && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Live Verification Info</h3>
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      <div className="text-sm space-y-2">
+                        <div>{shareError}</div>
+                        {shareFallbackText && (
+                          <Textarea
+                            value={shareFallbackText}
+                            readOnly
+                            className="text-xs font-mono h-32"
+                          />
+                        )}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                </div>
               )}
-              <AlertTitle className={readiness.ready ? 'text-success' : 'text-destructive'}>
-                Live Readiness: {readiness.ready ? 'Ready' : 'Not Ready'}
-              </AlertTitle>
-              <AlertDescription className="mt-2 space-y-1 text-sm">
-                <div className="font-semibold">{readiness.summary}</div>
-                {readiness.details.map((detail, idx) => (
-                  <div key={idx} className="text-xs">{detail}</div>
-                ))}
-                {readiness.healthCheckResult && (
-                  <div className="mt-2 pt-2 border-t border-success/20">
-                    <div className="text-xs">Backend Version: {readiness.healthCheckResult.backendVersion}</div>
-                    <div className="text-xs">System Time: {readiness.healthCheckResult.systemTime}</div>
+
+              {/* Captured Errors Section */}
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Captured Errors ({errors.length})</h3>
+                {errors.length === 0 ? (
+                  <Alert>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertDescription>No errors captured</AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="space-y-2">
+                    {errors.map((error, idx) => {
+                      const key = `${error.timestamp}-${idx}`;
+                      const stoppedInfo = error.detectedIssue === 'canisterStopped';
+                      
+                      return (
+                        <Alert key={key} variant={stoppedInfo ? 'destructive' : 'default'}>
+                          <div className="flex items-start gap-2">
+                            {stoppedInfo ? (
+                              <Power className="h-4 w-4 mt-0.5 text-destructive" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 mt-0.5" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant={getTypeColor(error.type)}>{error.type}</Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(error.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                              {stoppedInfo && error.detectedCanisterId && (
+                                <div className="mb-2 p-2 bg-destructive/10 rounded">
+                                  <div className="text-xs font-semibold">Canister Stopped</div>
+                                  <div className="text-xs font-mono mt-1">
+                                    {error.detectedCanisterId}
+                                  </div>
+                                </div>
+                              )}
+                              <AlertDescription className="text-xs">
+                                <div className="font-semibold mb-1">{error.context}</div>
+                                <div className="font-mono bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap break-words">
+                                  {error.message}
+                                </div>
+                                {error.stack && (
+                                  <details className="mt-2">
+                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                                      Stack trace
+                                    </summary>
+                                    <div className="mt-1 font-mono text-[10px] bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap break-words">
+                                      {error.stack}
+                                    </div>
+                                  </details>
+                                )}
+                              </AlertDescription>
+                            </div>
+                          </div>
+                        </Alert>
+                      );
+                    })}
                   </div>
                 )}
-              </AlertDescription>
-            </Alert>
-          </div>
-
-          {/* Publish to Live Canister Section */}
-          <div className="mb-4" ref={publishSectionRef}>
-            <Card className="border-primary/30 bg-primary/5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Rocket className="h-4 w-4 text-primary" />
-                  Publish to Live Canister
-                </CardTitle>
-                <CardDescription className="text-xs mt-1">
-                  This app cannot publish itself. Publishing is done via the Caffeine editor.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm space-y-3">
-                  <div>
-                    <div className="font-semibold mb-2">How to Publish Draft to Live:</div>
-                    <ol className="list-decimal list-inside space-y-2 text-xs ml-2">
-                      <li>
-                        <strong>Verify Prerequisites:</strong> Check that the Live Readiness result above shows <span className="font-mono bg-background/50 px-1 rounded">"Ready"</span> status. Ensure all testing is complete on your draft version.
-                      </li>
-                      <li>
-                        <strong>Prepare Runtime Configuration:</strong> Your live deployment must include a file named <span className="font-mono bg-background/50 px-1 rounded">/env.json</span> in the frontend assets with a <strong>non-empty</strong> <span className="font-mono bg-background/50 px-1 rounded">CANISTER_ID_BACKEND</span> value:
-                        <div className="mt-1 font-mono text-xs bg-background/50 p-2 rounded">
-                          {'{ "CANISTER_ID_BACKEND": "your-live-backend-canister-id" }'}
-                        </div>
-                        <div className="mt-1 text-muted-foreground">
-                          This configuration is loaded into <span className="font-mono">window.__ENV__</span> at runtime. Without a non-empty value, the frontend cannot connect to the backend.
-                        </div>
-                      </li>
-                      <li>
-                        <strong>Publish via Caffeine Editor:</strong> In the Caffeine editor, navigate to the <span className="font-semibold">Live</span> tab and click <span className="font-semibold">Publish</span>. This will deploy your frontend assets (including <span className="font-mono bg-background/50 px-1 rounded">/env.json</span>) to your live canister.
-                      </li>
-                      <li>
-                        <strong>Verify Post-Publish:</strong> After publishing, open your live URL in a browser. Open this Deployment Diagnostics panel and:
-                        <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                          <li>Click <span className="font-mono bg-background/50 px-1 rounded">"Run Backend Health Check"</span> to verify connectivity</li>
-                          <li>Verify the health check returns success</li>
-                          <li>Click <span className="font-mono bg-background/50 px-1 rounded">"Copy Live Verification Info"</span> to capture deployment details</li>
-                          <li>Verify Live Readiness shows <span className="font-mono bg-background/50 px-1 rounded">"Ready"</span> status</li>
-                          <li>Test core application functionality</li>
-                        </ul>
-                      </li>
-                    </ol>
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyPublishChecklist}
-                    className="w-full sm:w-auto"
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy Publish Checklist
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Publish Checklist Fallback */}
-          {publishChecklistError && publishChecklistFallbackText && (
-            <div className="mb-4">
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>{publishChecklistError}</AlertTitle>
-                <AlertDescription className="mt-2">
-                  <Textarea
-                    value={publishChecklistFallbackText}
-                    readOnly
-                    className="mt-2 font-mono text-xs h-48"
-                    onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                  />
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-
-          {/* Share Fallback */}
-          {shareError && shareFallbackText && (
-            <div className="mb-4">
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>{shareError}</AlertTitle>
-                <AlertDescription className="mt-2">
-                  <Textarea
-                    value={shareFallbackText}
-                    readOnly
-                    className="mt-2 font-mono text-xs h-48"
-                    onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                  />
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-
-          {/* Runtime Configuration Issue */}
-          {runtimeEnvMessage && runtimeEnvMessage.includes('missing') && (
-            <div className="mb-4">
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Runtime Configuration Issue</AlertTitle>
-                <AlertDescription className="mt-2 text-xs">
-                  {runtimeEnvMessage}
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-
-          {/* Errors List */}
-          <ScrollArea className="flex-1">
-            <div className="space-y-2 pr-4">
-              {errors.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  No errors captured yet
-                </div>
-              ) : (
-                errors.map((error, index) => (
-                  <Card key={`${error.timestamp}-${index}`} className="border-destructive/50">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant={getTypeColor(error.type)} className="shrink-0">
-                              {error.type}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(error.timestamp).toLocaleString()}
-                            </span>
-                          </div>
-                          <CardTitle className="text-sm break-words">{error.context}</CardTitle>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2">
-                        <div className="text-sm font-mono bg-muted p-2 rounded break-words">
-                          {error.message}
-                        </div>
-                        {error.detectedIssue && (
-                          <Alert className="border-warning bg-warning/10">
-                            <Power className="h-4 w-4 text-warning" />
-                            <AlertTitle className="text-warning text-sm">
-                              🔴 Detected Issue: {error.detectedIssue}
-                            </AlertTitle>
-                            {error.detectedCanisterId && (
-                              <AlertDescription className="text-xs mt-1">
-                                Canister ID: {error.detectedCanisterId}
-                              </AlertDescription>
-                            )}
-                          </Alert>
-                        )}
-                        {error.stack && (
-                          <details className="text-xs">
-                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                              Stack trace
-                            </summary>
-                            <pre className="mt-2 p-2 bg-muted rounded overflow-x-auto text-[10px] whitespace-pre-wrap break-words">
-                              {error.stack}
-                            </pre>
-                          </details>
-                        )}
-                        {error.metadata && (
-                          <details className="text-xs">
-                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                              Connection details
-                            </summary>
-                            <div className="mt-2 p-2 bg-muted rounded space-y-1">
-                              <div>Network: {error.metadata.network}</div>
-                              <div>Host: {error.metadata.host}</div>
-                              <div>Canister ID: {error.metadata.canisterId || '(not resolved)'}</div>
-                              <div>Source: {error.metadata.canisterIdSource}</div>
-                            </div>
-                          </details>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+              </div>
             </div>
           </ScrollArea>
         </CardContent>
