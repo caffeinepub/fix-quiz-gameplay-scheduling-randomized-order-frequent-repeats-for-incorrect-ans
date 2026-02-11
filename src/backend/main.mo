@@ -6,6 +6,7 @@ import Iter "mo:core/Iter";
 import Time "mo:core/Time";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
+import Migration "migration";
 
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
@@ -13,6 +14,8 @@ import MixinStorage "blob-storage/Mixin";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
+// Apply migration on upgrade
+(with migration = Migration.run)
 actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -48,9 +51,15 @@ actor {
 
   public type Question = {
     text : Text;
+    hint : ?Text;
     imageUrl : ?Storage.ExternalBlob;
     answers : [Text];
     correctAnswer : Nat;
+  };
+
+  public type Article = {
+    title : Text;
+    content : Text;
   };
 
   public type QuizId = Text;
@@ -58,6 +67,9 @@ actor {
 
   let quizSets = Map.empty<Text, [Question]>();
   let blockNames = Map.empty<Text, Map.Map<Nat, Text>>();
+
+  // Persistent Article Store
+  let persistentArticles = Map.empty<Text, Article>();
 
   public query ({ caller }) func isValidQuizId(quizId : QuizId) : async Bool {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
@@ -123,9 +135,10 @@ actor {
     };
   };
 
-  /// Returns admin role assignment status.
-  /// Accessible to all users including guests to check their own status.
   public query ({ caller }) func hasAdminRole() : async Bool {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can check admin role");
+    };
     AccessControl.hasPermission(accessControlState, caller, #admin);
   };
 
@@ -274,12 +287,93 @@ actor {
     backendVersion : Nat;
   };
 
-  /// Public endpoint for basic health check (unauthenticated)
   public query ({ caller }) func healthCheck() : async HealthCheckResult {
     {
       systemTime = Time.now();
       backendVersion = 2;
     };
   };
-};
 
+  // Persistent Article Queries (No Outcalls/AI for now)
+  public shared ({ caller }) func getArticle(articleId : Text) : async Article {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can access articles");
+    };
+    switch (persistentArticles.get(articleId)) {
+      case (?article) { article };
+      case (null) {
+        let article = {
+          title = "Oops! No article found.";
+          content = "This is a placeholder article with no information. The real one will give you a great explanation with illustrations.";
+        };
+        article;
+      };
+    };
+  };
+
+  public shared ({ caller }) func generateArticle(questionText : Text) : async Article {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can generate articles");
+    };
+    // Attempt to get existing persistent article
+    switch (persistentArticles.get(questionText)) {
+      case (?existingArticle) { existingArticle };
+      case (null) {
+        let content = "
+          # Short Summary
+          This section provides a high-level overview of the concepts involved in the question.
+
+          # Key Concepts
+          - Definition 1
+          - Concept 2
+          - Theorem 3
+
+          # Reasoning Steps
+          1. Identify the main topic.
+          2. Recall relevant formulas or techniques.
+          3. Apply logical reasoning to solve the problem.
+
+          # Common Pitfalls
+          - Misinterpreting the question
+          - Forgetting key assumptions
+          - Rushing through calculations
+
+          # Self-Check
+          Try to solve the following similar problem:
+          [Insert self-check question here]
+
+          # Final Thoughts
+          Review the solution and ensure you understand each step. Practice similar problems to reinforce your understanding.
+        ";
+
+        let newArticle = {
+          title = "Generated Study Article: " # questionText;
+          content;
+        };
+
+        // Persist generated article
+        persistentArticles.add(questionText, newArticle);
+
+        newArticle;
+      };
+    };
+  };
+
+  public shared ({ caller }) func writeArticle(_articleId : Text) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can write articles");
+    };
+  };
+
+  public shared ({ caller }) func pushAllArticlesToBackend() : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can push articles to backend");
+    };
+  };
+
+  public shared ({ caller }) func pushArticlesToContentTeam() : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can push articles to content team");
+    };
+  };
+};

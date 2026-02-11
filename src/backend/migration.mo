@@ -1,29 +1,49 @@
 import Map "mo:core/Map";
-import Text "mo:core/Text";
-import Nat "mo:core/Nat";
-import Array "mo:core/Array";
-import Iter "mo:core/Iter";
-import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
+import Storage "blob-storage/Storage";
+import AccessControl "authorization/access-control";
 
 module {
   type OldActor = {
-    quizSets : Map.Map<Principal, Map.Map<Text, [Question]>>;
-    userProfiles : Map.Map<Principal, { name : Text }>;
+    accessControlState : AccessControl.AccessControlState;
+    userProfiles : Map.Map<Principal, {
+      name : Text;
+    }>;
+    quizSets : Map.Map<Text, [Question]>;
+    blockNames : Map.Map<Text, Map.Map<Nat, Text>>;
+    articles : Map.Map<Text, Map.Map<Nat, Article>>;
   };
 
-  type Question = {
+  type NewActor = {
+    accessControlState : AccessControl.AccessControlState;
+    userProfiles : Map.Map<Principal, {
+      name : Text;
+    }>;
+    quizSets : Map.Map<Text, [Question]>;
+    blockNames : Map.Map<Text, Map.Map<Nat, Text>>;
+    persistentArticles : Map.Map<Text, Article>;
+  };
+
+  public type Question = {
     text : Text;
+    hint : ?Text;
+    imageUrl : ?Storage.ExternalBlob;
     answers : [Text];
     correctAnswer : Nat;
   };
 
-  type NewActor = {
-    quizSets : Map.Map<Principal, Map.Map<Text, [Question]>>;
-    userProfiles : Map.Map<Principal, { name : Text }>;
+  public type Article = {
+    title : Text;
+    content : Text;
   };
 
   public func run(old : OldActor) : NewActor {
-    old;
+    let blockNames = Map.empty<Text, Map.Map<Nat, Text>>();
+    {
+      accessControlState = old.accessControlState;
+      userProfiles = old.userProfiles;
+      quizSets = old.quizSets;
+      blockNames;
+      persistentArticles = Map.empty<Text, Article>();
+    };
   };
 };

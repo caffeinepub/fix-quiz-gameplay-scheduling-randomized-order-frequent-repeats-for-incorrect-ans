@@ -19,8 +19,13 @@ export interface HealthCheckResult {
     backendVersion: bigint;
     systemTime: bigint;
 }
+export interface Article {
+    title: string;
+    content: string;
+}
 export interface Question {
     answers: Array<string>;
+    hint?: string;
     text: string;
     correctAnswer: bigint;
     imageUrl?: ExternalBlob;
@@ -42,8 +47,10 @@ export interface backendInterface {
     appendQuestions(quizId: QuizId, newQuestions: Array<Question>): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     exportAllState(): Promise<StateSnapshot>;
+    generateArticle(questionText: string): Promise<Article>;
     getAllBlockNames(quizId: QuizId): Promise<Array<[bigint, string]>>;
     getAllQuestions(quizId: QuizId): Promise<Array<Question>>;
+    getArticle(articleId: string): Promise<Article>;
     getBlockName(quizId: QuizId, blockIndex: bigint): Promise<string | null>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
@@ -51,21 +58,17 @@ export interface backendInterface {
     getQuestionCount(quizId: QuizId): Promise<bigint>;
     getQuestions(quizId: QuizId, chunkSize: bigint, chunkIndex: bigint): Promise<Array<Question>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
-    /**
-     * / Returns admin role assignment status.
-     * / Accessible to all users including guests to check their own status.
-     */
     hasAdminRole(): Promise<boolean>;
-    /**
-     * / Public endpoint for basic health check (unauthenticated)
-     */
     healthCheck(): Promise<HealthCheckResult>;
     isCallerAdmin(): Promise<boolean>;
     isValidQuizId(quizId: QuizId): Promise<boolean>;
     listAllQuizzes(): Promise<Array<QuizId>>;
+    pushAllArticlesToBackend(): Promise<void>;
+    pushArticlesToContentTeam(): Promise<void>;
     renameQuiz(oldQuizId: QuizId, newQuizId: QuizId): Promise<void>;
     restoreState(exportedState: StateSnapshot): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     saveQuestions(quizId: QuizId, questionsInput: Array<Question>): Promise<void>;
     setBlockName(quizId: QuizId, blockIndex: bigint, blockName: string): Promise<void>;
+    writeArticle(_articleId: string): Promise<void>;
 }

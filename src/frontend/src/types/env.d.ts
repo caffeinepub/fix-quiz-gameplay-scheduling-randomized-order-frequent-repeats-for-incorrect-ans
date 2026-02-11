@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_BUILD_TIMESTAMP?: string;
   readonly VITE_APP_VERSION?: string;
   readonly VITE_DEPLOYMENT_ID?: string;
+  readonly VITE_BUILD_VERSION?: string;
 }
 
 interface ImportMeta {
@@ -17,6 +18,9 @@ interface ImportMeta {
 interface Window {
   __ENV__?: {
     CANISTER_ID_BACKEND?: string;
+    BUILD_VERSION?: string;
+    BUILD_TIMESTAMP?: string;
+    DEPLOYMENT_ID?: string;
   };
   __ENV_LOAD_STATUS__?: 'loading' | 'loaded' | 'missing' | 'error';
 }

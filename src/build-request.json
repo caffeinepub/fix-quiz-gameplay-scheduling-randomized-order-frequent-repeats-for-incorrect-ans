@@ -1,37 +1,86 @@
 {
   "kind": "build_request",
-  "title": "Remove the “Software update” update-available pop-up from the app",
-  "priority": "normal",
+  "title": "Replace placeholder Study articles with real generated/stored article content",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Remove the in-app \"Software update\"/\"Update Available\" pop-up/banner so it is never shown anywhere in the app, while keeping all other UI and functionality unchanged. This includes removing the PendingUpdateBanner rendering from all App entry states (unauthenticated view, actor initialization error view, profile setup view, and main authenticated view).",
-      "target": "frontend",
+      "text": "Replace the placeholder implementation of backend article generation so that calling `generateArticle(questionText)` returns a substantive study article (not the current placeholder text) with multiple sections (e.g., short summary, key concepts, reasoning steps, common pitfalls, and a short self-check), suitable for studying the specific question.",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-6"
+          "recent-messages"
         ],
         "quotes": [
-          "keep all other the same but remove \"Software update\" pop up window from app"
+          "last modification is not ready, I can see nice icon \"study\" on right side of wrong answered question but there is no AI generated study content, only this messag:This is a generated long-form educational article... Please add the articles"
         ]
       },
       "acceptanceCriteria": [
-        "No update-related pop-up/banner is displayed on any screen/state of the app (unauthenticated, authenticated, profile setup, or connection error states).",
-        "All other app behavior remains unchanged (login, quiz flows, diagnostics, etc.).",
-        "The frontend builds successfully with no unused-import or lint/type errors related to PendingUpdateBanner."
+        "For the example question text shown by the user, the returned `Article.content` does not contain the placeholder sentence starting with \"This is a generated long-form educational article...\"",
+        "`generateArticle(questionText)` returns non-empty `Article.title` and `Article.content` that includes at least 3 clearly separated sections (headings or labeled paragraphs)",
+        "The backend keeps enforcing the existing authorization rule: only callers with `#user` permission can generate/read articles"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Add backend persistence for generated/stored articles so that once an article is created for a question, subsequent requests for the same question return the same saved article instead of re-generating placeholder content on each call.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "recent-messages"
+        ],
+        "quotes": [
+          "Please add the articles"
+        ]
+      },
+      "acceptanceCriteria": [
+        "After generating an article for a given `questionText`, a subsequent call to `generateArticle(questionText)` returns the previously stored article",
+        "Articles remain available after a canister upgrade (implement stable persistence via preupgrade/postupgrade or a conditional migration, as appropriate for this project)"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Update the frontend Study article flow (Wrong Answers Review → Study Article View) so it reliably displays the substantive article returned by the backend and never shows placeholder-only content to the user.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "recent-messages"
+        ],
+        "quotes": [
+          "there is no AI generated study content, only this messag:This is a generated long-form educational article..."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Clicking the Study button for a wrong-answered question shows the full article content returned by the backend",
+        "The Study article view shows a clear error state if article generation fails (no silent fallback to placeholder text)",
+        "The Study article view continues to show the question reference and article title/content in a readable, scrollable layout as it does today"
       ]
     }
   ],
   "constraints": [
-    "Do not modify any other UI, copy, flows, or backend behavior beyond removing the software-update pop-up/banner.",
-    "Do not edit files under frontend/src/components/ui (read-only)."
+    "Do not integrate external LLM/AI services (no OpenAI/Anthropic/etc.); article content must be generated/stored within the Internet Computer canister and/or shipped as static/backend-managed content.",
+    "Respect the existing single-actor Motoko backend architecture (all logic in `backend/main.mo`; add `backend/migration.mo` only if required by state upgrade needs).",
+    "Do not edit files under `frontend/src/components/ui` or any other immutable frontend paths listed in SYSTEM_CONTEXT."
   ],
   "nonGoals": [
-    "Adding a different update notification mechanism.",
-    "Changing service worker/cache refresh behavior beyond removing the UI pop-up/banner."
+    "Adding third-party authentication providers beyond Internet Identity.",
+    "Adding real-time features (WebSockets/chat).",
+    "Building an external content pipeline or CMS integration for article authoring."
   ],
   "imageRequirements": {
     "required": [],
     "edits": []
+  },
+  "userProfileUpdate": {
+    "goalsToAdd": [],
+    "goalsToRemove": [],
+    "preferencesToAdd": [
+      "Use English for any user-facing text added/changed as part of this build request."
+    ],
+    "preferencesToRemove": [],
+    "miscToAdd": [],
+    "miscToRemove": [],
+    "fieldsToSet": {},
+    "fieldsToDelete": []
   }
 }

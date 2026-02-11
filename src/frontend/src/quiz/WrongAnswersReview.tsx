@@ -1,16 +1,17 @@
 import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, BookOpen } from 'lucide-react';
 import { ScrollArea } from '../components/ui/scroll-area';
 import type { WrongAnswerEntry } from './wrongAnswerTypes';
 
 interface WrongAnswersReviewProps {
   wrongAnswers: WrongAnswerEntry[];
   onBack: () => void;
+  onStudy?: (entry: WrongAnswerEntry) => void;
 }
 
-export default function WrongAnswersReview({ wrongAnswers, onBack }: WrongAnswersReviewProps) {
+export default function WrongAnswersReview({ wrongAnswers, onBack, onStudy }: WrongAnswersReviewProps) {
   // Handle Escape key press
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -55,7 +56,7 @@ export default function WrongAnswersReview({ wrongAnswers, onBack }: WrongAnswer
                   key={index}
                   className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 items-start">
                     <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive font-semibold">
                       {entry.questionNumber}
                     </div>
@@ -64,6 +65,17 @@ export default function WrongAnswersReview({ wrongAnswers, onBack }: WrongAnswer
                         {entry.questionText}
                       </p>
                     </div>
+                    {onStudy && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onStudy(entry)}
+                        className="shrink-0 gap-2"
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        <span className="hidden sm:inline">Study</span>
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

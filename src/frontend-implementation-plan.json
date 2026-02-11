@@ -1,26 +1,26 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Remove in-app software update / update-available banner UI",
+  "title": "Ensure Study Article flow renders real backend article content and blocks placeholder content",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Ensure the in-app “Software update” / “Update Available” banner is never displayed in any app state, without changing any other UI or behavior.",
+      "id": "REQ-3",
+      "summary": "Harden the Study article flow so it renders the backend-provided article reliably and shows an explicit error when generation fails or returns placeholder-only content.",
       "acceptanceCriteria": [
-        "No update-related pop-up/banner is displayed on any screen/state of the app (unauthenticated, authenticated, profile setup, or connection error states).",
-        "All other app behavior remains unchanged (login, quiz flows, diagnostics, etc.).",
-        "The frontend builds successfully with no unused-import or lint/type errors related to PendingUpdateBanner."
+        "Clicking the Study button for a wrong-answered question shows the full article content returned by the backend",
+        "The Study article view shows a clear error state if article generation fails (no silent fallback to placeholder text)",
+        "The Study article view continues to show the question reference and article title/content in a readable, scrollable layout as it does today"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/App.tsx",
+          "path": "frontend/src/hooks/useGenerateArticle.ts",
           "operation": "modify",
-          "description": "Remove PendingUpdateBanner import and remove its rendering from all App entry states (unauthenticated view, actor initialization error view, profile setup view, main authenticated view) while leaving all other logic/UI untouched."
+          "description": "Add client-side validation for the returned Article so placeholder-only content (e.g., the known placeholder sentence starting with \"This is a generated long-form educational article...\") is treated as an error by throwing, ensuring the UI never renders placeholder content and instead enters an explicit error state."
         },
         {
-          "path": "frontend/src/components/PendingUpdateBanner.tsx",
+          "path": "frontend/src/quiz/StudyArticleView.tsx",
           "operation": "modify",
-          "description": "Disable the update banner UI so it never renders (e.g., return null) and remove any now-unused imports/logic inside the component to prevent lint/type errors, without changing any other app flows."
+          "description": "Update the Study Article view to handle the hook’s validation/errors cleanly: keep the existing readable, scrollable layout for question reference + article title/content; ensure error copy is clear and in English; and ensure there is no fallback rendering path that could display placeholder-only content when generation fails."
         }
       ]
     }

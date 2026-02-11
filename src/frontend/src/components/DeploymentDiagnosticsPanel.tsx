@@ -13,7 +13,7 @@ import type { HealthCheckResult } from '../backend';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { AlertCircle, Download, Trash2, X, Activity, CheckCircle, XCircle, Loader2, RefreshCw, Share2, AlertTriangle, Copy, Rocket, Power } from 'lucide-react';
+import { AlertCircle, Download, Trash2, X, Activity, CheckCircle, XCircle, Loader2, RefreshCw, Share2, Copy, Rocket } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Textarea } from './ui/textarea';
@@ -375,6 +375,7 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
                         <li>Return to the Caffeine editor</li>
                         <li>Follow the checklist instructions to publish via the editor</li>
                         <li>After publishing, update /env.json with your backend canister ID</li>
+                        <li>Verify the deployment using the health check and verification tools</li>
                       </ol>
                       <Button
                         variant="outline"
@@ -392,7 +393,7 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
                             <Textarea
                               value={publishChecklistFallbackText}
                               readOnly
-                              className="text-xs font-mono h-32"
+                              className="font-mono text-xs h-64 mt-2"
                             />
                           )}
                         </div>
@@ -414,7 +415,7 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
                           <Textarea
                             value={shareFallbackText}
                             readOnly
-                            className="text-xs font-mono h-32"
+                            className="font-mono text-xs h-64 mt-2"
                           />
                         )}
                       </div>
@@ -424,66 +425,55 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
               )}
 
               {/* Captured Errors Section */}
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Captured Errors ({errors.length})</h3>
-                {errors.length === 0 ? (
-                  <Alert>
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertDescription>No errors captured</AlertDescription>
-                  </Alert>
-                ) : (
+              {errors.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Captured Errors ({errors.length})</h3>
                   <div className="space-y-2">
-                    {errors.map((error, idx) => {
-                      const key = `${error.timestamp}-${idx}`;
-                      const stoppedInfo = error.detectedIssue === 'canisterStopped';
-                      
-                      return (
-                        <Alert key={key} variant={stoppedInfo ? 'destructive' : 'default'}>
-                          <div className="flex items-start gap-2">
-                            {stoppedInfo ? (
-                              <Power className="h-4 w-4 mt-0.5 text-destructive" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 mt-0.5" />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge variant={getTypeColor(error.type)}>{error.type}</Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(error.timestamp).toLocaleString()}
-                                </span>
-                              </div>
-                              {stoppedInfo && error.detectedCanisterId && (
-                                <div className="mb-2 p-2 bg-destructive/10 rounded">
-                                  <div className="text-xs font-semibold">Canister Stopped</div>
-                                  <div className="text-xs font-mono mt-1">
-                                    {error.detectedCanisterId}
-                                  </div>
-                                </div>
-                              )}
-                              <AlertDescription className="text-xs">
-                                <div className="font-semibold mb-1">{error.context}</div>
-                                <div className="font-mono bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap break-words">
-                                  {error.message}
-                                </div>
-                                {error.stack && (
-                                  <details className="mt-2">
-                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                                      Stack trace
-                                    </summary>
-                                    <div className="mt-1 font-mono text-[10px] bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap break-words">
-                                      {error.stack}
-                                    </div>
-                                  </details>
-                                )}
-                              </AlertDescription>
+                    {errors.map((error, index) => (
+                      <Alert key={`${error.timestamp}-${index}`} variant="destructive">
+                        <AlertTitle className="flex items-center gap-2">
+                          <Badge variant={getTypeColor(error.type)}>{error.type}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(error.timestamp).toLocaleString()}
+                          </span>
+                        </AlertTitle>
+                        <AlertDescription>
+                          <div className="text-sm space-y-1">
+                            <div className="font-semibold">{error.context}</div>
+                            <div className="text-xs font-mono bg-muted p-2 rounded overflow-x-auto">
+                              {error.message}
                             </div>
+                            {error.detectedIssue && (
+                              <div className="mt-2 p-2 bg-destructive/10 rounded border border-destructive/20">
+                                <div className="font-semibold text-xs">⚠️ Detected Issue:</div>
+                                <div className="text-xs mt-1">{error.detectedIssue}</div>
+                                {error.detectedCanisterId && (
+                                  <div className="text-xs mt-1 font-mono">
+                                    Canister: {error.detectedCanisterId}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {error.metadata && (
+                              <details className="text-xs">
+                                <summary className="cursor-pointer hover:underline">
+                                  Connection Details
+                                </summary>
+                                <div className="mt-1 font-mono bg-muted p-2 rounded">
+                                  <div>Host: {error.metadata.host}</div>
+                                  <div>Network: {error.metadata.network}</div>
+                                  <div>Canister ID: {error.metadata.canisterId || '(not resolved)'}</div>
+                                  <div>Source: {error.metadata.canisterIdSource}</div>
+                                </div>
+                              </details>
+                            )}
                           </div>
-                        </Alert>
-                      );
-                    })}
+                        </AlertDescription>
+                      </Alert>
+                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </ScrollArea>
         </CardContent>

@@ -23,6 +23,7 @@ export const QuizId = IDL.Text;
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const Question = IDL.Record({
   'answers' : IDL.Vec(IDL.Text),
+  'hint' : IDL.Opt(IDL.Text),
   'text' : IDL.Text,
   'correctAnswer' : IDL.Nat,
   'imageUrl' : IDL.Opt(ExternalBlob),
@@ -39,6 +40,7 @@ export const StateSnapshot = IDL.Record({
   'version' : IDL.Nat,
   'questions' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Vec(Question))),
 });
+export const Article = IDL.Record({ 'title' : IDL.Text, 'content' : IDL.Text });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const HealthCheckResult = IDL.Record({
   'backendVersion' : IDL.Nat,
@@ -76,12 +78,14 @@ export const idlService = IDL.Service({
   'appendQuestions' : IDL.Func([QuizId, IDL.Vec(Question)], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'exportAllState' : IDL.Func([], [StateSnapshot], []),
+  'generateArticle' : IDL.Func([IDL.Text], [Article], []),
   'getAllBlockNames' : IDL.Func(
       [QuizId],
       [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text))],
       ['query'],
     ),
   'getAllQuestions' : IDL.Func([QuizId], [IDL.Vec(Question)], ['query']),
+  'getArticle' : IDL.Func([IDL.Text], [Article], []),
   'getBlockName' : IDL.Func([QuizId, IDL.Nat], [IDL.Opt(IDL.Text)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
@@ -102,11 +106,14 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isValidQuizId' : IDL.Func([QuizId], [IDL.Bool], ['query']),
   'listAllQuizzes' : IDL.Func([], [IDL.Vec(QuizId)], ['query']),
+  'pushAllArticlesToBackend' : IDL.Func([], [], []),
+  'pushArticlesToContentTeam' : IDL.Func([], [], []),
   'renameQuiz' : IDL.Func([QuizId, QuizId], [], []),
   'restoreState' : IDL.Func([StateSnapshot], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'saveQuestions' : IDL.Func([QuizId, IDL.Vec(Question)], [], []),
   'setBlockName' : IDL.Func([QuizId, IDL.Nat, IDL.Text], [], []),
+  'writeArticle' : IDL.Func([IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -127,6 +134,7 @@ export const idlFactory = ({ IDL }) => {
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const Question = IDL.Record({
     'answers' : IDL.Vec(IDL.Text),
+    'hint' : IDL.Opt(IDL.Text),
     'text' : IDL.Text,
     'correctAnswer' : IDL.Nat,
     'imageUrl' : IDL.Opt(ExternalBlob),
@@ -143,6 +151,7 @@ export const idlFactory = ({ IDL }) => {
     'version' : IDL.Nat,
     'questions' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Vec(Question))),
   });
+  const Article = IDL.Record({ 'title' : IDL.Text, 'content' : IDL.Text });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const HealthCheckResult = IDL.Record({
     'backendVersion' : IDL.Nat,
@@ -180,12 +189,14 @@ export const idlFactory = ({ IDL }) => {
     'appendQuestions' : IDL.Func([QuizId, IDL.Vec(Question)], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'exportAllState' : IDL.Func([], [StateSnapshot], []),
+    'generateArticle' : IDL.Func([IDL.Text], [Article], []),
     'getAllBlockNames' : IDL.Func(
         [QuizId],
         [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text))],
         ['query'],
       ),
     'getAllQuestions' : IDL.Func([QuizId], [IDL.Vec(Question)], ['query']),
+    'getArticle' : IDL.Func([IDL.Text], [Article], []),
     'getBlockName' : IDL.Func(
         [QuizId, IDL.Nat],
         [IDL.Opt(IDL.Text)],
@@ -210,11 +221,14 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isValidQuizId' : IDL.Func([QuizId], [IDL.Bool], ['query']),
     'listAllQuizzes' : IDL.Func([], [IDL.Vec(QuizId)], ['query']),
+    'pushAllArticlesToBackend' : IDL.Func([], [], []),
+    'pushArticlesToContentTeam' : IDL.Func([], [], []),
     'renameQuiz' : IDL.Func([QuizId, QuizId], [], []),
     'restoreState' : IDL.Func([StateSnapshot], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'saveQuestions' : IDL.Func([QuizId, IDL.Vec(Question)], [], []),
     'setBlockName' : IDL.Func([QuizId, IDL.Nat, IDL.Text], [], []),
+    'writeArticle' : IDL.Func([IDL.Text], [], []),
   });
 };
 

@@ -1,16 +1,20 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
-  "architectural_notes": [],
-  "known_issues": [],
+  "summary": "Add real AI-generated study articles for wrong-answered questions (replace placeholder content shown after clicking the Study icon).",
+  "architectural_notes": [
+    "Study-article page currently shows placeholder text; implement backend/content generation pipeline to produce and store real long-form educational articles per question."
+  ],
+  "known_issues": [
+    "Study icon appears, but study-article content is only placeholder text (no real AI-generated article)."
+  ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-remove-the-in-app-software-update-update-available-pop-up-banner-so-it-is-never-shown-anywhere-in-the-app-while-keeping-all-other-ui-and-functionality-unchanged-this-includes-removing-the-pendingupdatebanner-rendering-from-all-app-entry-states-unauthenticated-view-actor-initialization-error-view-profile-setup-view-and-main-authenticated-view",
-      "title": "Remove the in-app \"Software update\"/\"Update Available\" pop-up/banner so it is never shown anywhere in the app, while keeping all other UI and functionality unchanged. This includes removing the PendingUpdateBanner rendering from all App entry states (unauthenticated view, actor initialization error view, profile setup view, and main authenticated view).",
+      "id": "feature-update-the-frontend-study-article-flow-wrong-answers-review-study-article-view-so-it-reliably-displays-the-substantive-article-returned-by-the-backend-and-never-shows-placeholder-only-content-to-the-user",
+      "title": "Update the frontend Study article flow (Wrong Answers Review → Study Article View) so it reliably displays the substantive article returned by the backend and never shows placeholder-only content to the user.",
       "reqIds": [
-        "REQ-1"
+        "REQ-3"
       ],
       "version": 1
     }
@@ -18,12 +22,28 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Remove the \"Software update\" pop-up window from the app (keep everything else the same)",
+      "summary": "Implement actual AI-generated study articles content for wrong-answered questions (replace current placeholder article text shown via Study icon).",
       "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Replace the placeholder implementation of backend article generation so that calling `generateArticle(questionText)` returns a substantive study article (not the current placeholder text) with multiple sections (e.g., short summary, key concepts, reasoning steps, common pitfalls, and a short self-check), suitable for studying the specific question.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Add backend persistence for generated/stored articles so that once an article is created for a question, subsequent requests for the same question return the same saved article instead of re-generating placeholder content on each call.",
+      "reqIds": [
+        "REQ-2"
+      ],
       "status": "pending"
     }
   ],
-  "projectName": "Remove the “Software update” update-available pop-up from the app",
+  "projectName": "Replace placeholder Study articles with real generated/stored article content",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

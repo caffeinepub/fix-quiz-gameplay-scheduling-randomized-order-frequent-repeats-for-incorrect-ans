@@ -8,9 +8,11 @@ import QuizEditor from './quiz/QuizEditor';
 import QuizGameplay from './quiz/QuizGameplay';
 import QuizResults from './quiz/QuizResults';
 import WrongAnswersReview from './quiz/WrongAnswersReview';
+import StudyArticleView from './quiz/StudyArticleView';
 import DeploymentDiagnosticsPanel from './components/DeploymentDiagnosticsPanel';
 import BuildIdentityFooter from './components/BuildIdentityFooter';
-import { BookOpen, Edit, Play, Bug, AlertTriangle, RefreshCw, Power } from 'lucide-react';
+import AppHeaderBrand from './components/AppHeaderBrand';
+import { Edit, Play, Bug, AlertTriangle, RefreshCw, Power } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
@@ -22,7 +24,7 @@ import { refreshToLatestBuild } from './utils/refreshToLatestBuild';
 import { detectStoppedCanister, formatStoppedCanisterMessage, getStoppedCanisterRecoverySteps } from './utils/stoppedCanisterDetection';
 import type { WrongAnswerEntry } from './quiz/wrongAnswerTypes';
 
-type View = 'editor' | 'gameplay' | 'results' | 'wrongAnswersReview';
+type View = 'editor' | 'gameplay' | 'results' | 'wrongAnswersReview' | 'studyArticle';
 
 const ACTIVE_QUIZ_ID = 'TN intelligence Quiz';
 
@@ -42,6 +44,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>('gameplay');
   const [sessionScore, setSessionScore] = useState({ correct: 0, total: 0 });
   const [wrongAnswers, setWrongAnswers] = useState<WrongAnswerEntry[]>([]);
+  const [selectedStudyQuestion, setSelectedStudyQuestion] = useState<WrongAnswerEntry | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [focusPublishSection, setFocusPublishSection] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -93,6 +96,15 @@ export default function App() {
     setCurrentView('results');
   };
 
+  const handleStudyQuestion = (entry: WrongAnswerEntry) => {
+    setSelectedStudyQuestion(entry);
+    setCurrentView('studyArticle');
+  };
+
+  const handleBackToWrongAnswers = () => {
+    setCurrentView('wrongAnswersReview');
+  };
+
   const handlePlayAgain = () => {
     setCurrentView('gameplay');
   };
@@ -129,10 +141,7 @@ export default function App() {
         <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <BookOpen className="h-8 w-8 text-primary" />
-                <h1 className="text-2xl font-bold text-foreground">Quiz Master</h1>
-              </div>
+              <AppHeaderBrand />
               <LoginButton />
             </div>
           </div>
@@ -168,10 +177,7 @@ export default function App() {
         <header className="border-b border-border bg-card/50 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <BookOpen className="h-8 w-8 text-primary" />
-                <h1 className="text-2xl font-bold text-foreground">Quiz Master</h1>
-              </div>
+              <AppHeaderBrand />
               <LoginButton />
             </div>
           </div>
@@ -306,10 +312,7 @@ export default function App() {
         <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <BookOpen className="h-8 w-8 text-primary" />
-                <h1 className="text-2xl font-bold text-foreground">Quiz Master</h1>
-              </div>
+              <AppHeaderBrand />
               <div className="flex items-center gap-3">
                 {isAdmin && (
                   <div className="flex gap-2">
@@ -362,6 +365,14 @@ export default function App() {
           <WrongAnswersReview
             wrongAnswers={wrongAnswers}
             onBack={handleBackToResults}
+            onStudy={handleStudyQuestion}
+          />
+        )}
+        {currentView === 'studyArticle' && selectedStudyQuestion && (
+          <StudyArticleView
+            questionText={selectedStudyQuestion.questionText}
+            questionNumber={selectedStudyQuestion.questionNumber}
+            onBack={handleBackToWrongAnswers}
           />
         )}
       </main>

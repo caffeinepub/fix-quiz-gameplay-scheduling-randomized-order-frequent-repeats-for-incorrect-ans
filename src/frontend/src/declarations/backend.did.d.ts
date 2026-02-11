@@ -10,6 +10,7 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface Article { 'title' : string, 'content' : string }
 export type ExternalBlob = Uint8Array;
 export interface HealthCheckResult {
   'backendVersion' : bigint,
@@ -17,6 +18,7 @@ export interface HealthCheckResult {
 }
 export interface Question {
   'answers' : Array<string>,
+  'hint' : [] | [string],
   'text' : string,
   'correctAnswer' : bigint,
   'imageUrl' : [] | [ExternalBlob],
@@ -62,8 +64,10 @@ export interface _SERVICE {
   'appendQuestions' : ActorMethod<[QuizId, Array<Question>], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'exportAllState' : ActorMethod<[], StateSnapshot>,
+  'generateArticle' : ActorMethod<[string], Article>,
   'getAllBlockNames' : ActorMethod<[QuizId], Array<[bigint, string]>>,
   'getAllQuestions' : ActorMethod<[QuizId], Array<Question>>,
+  'getArticle' : ActorMethod<[string], Article>,
   'getBlockName' : ActorMethod<[QuizId, bigint], [] | [string]>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
@@ -71,23 +75,19 @@ export interface _SERVICE {
   'getQuestionCount' : ActorMethod<[QuizId], bigint>,
   'getQuestions' : ActorMethod<[QuizId, bigint, bigint], Array<Question>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
-  /**
-   * / Returns admin role assignment status.
-   * / Accessible to all users including guests to check their own status.
-   */
   'hasAdminRole' : ActorMethod<[], boolean>,
-  /**
-   * / Public endpoint for basic health check (unauthenticated)
-   */
   'healthCheck' : ActorMethod<[], HealthCheckResult>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isValidQuizId' : ActorMethod<[QuizId], boolean>,
   'listAllQuizzes' : ActorMethod<[], Array<QuizId>>,
+  'pushAllArticlesToBackend' : ActorMethod<[], undefined>,
+  'pushArticlesToContentTeam' : ActorMethod<[], undefined>,
   'renameQuiz' : ActorMethod<[QuizId, QuizId], undefined>,
   'restoreState' : ActorMethod<[StateSnapshot], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'saveQuestions' : ActorMethod<[QuizId, Array<Question>], undefined>,
   'setBlockName' : ActorMethod<[QuizId, bigint, string], undefined>,
+  'writeArticle' : ActorMethod<[string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

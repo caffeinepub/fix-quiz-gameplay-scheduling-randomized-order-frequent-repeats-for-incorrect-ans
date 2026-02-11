@@ -2,11 +2,11 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-remove-the-in-app-software-update-update-available-pop-up-banner-so-it-is-never-shown-anywhere-in-the-app-while-keeping-all-other-ui-and-functionality-unchanged-this-includes-removing-the-pendingupdatebanner-rendering-from-all-app-entry-states-unauthenticated-view-actor-initialization-error-view-profile-setup-view-and-main-authenticated-view",
-      "featureTitle": "Remove the in-app \"Software update\"/\"Update Available\" pop-up/banner so it is never shown anywhere in the app, while keeping all other UI and functionality unchanged. This includes removing the PendingUpdateBanner rendering from all App entry states (unauthenticated view, actor initialization error view, profile setup view, and main authenticated view).",
+      "featureId": "feature-update-the-frontend-study-article-flow-wrong-answers-review-study-article-view-so-it-reliably-displays-the-substantive-article-returned-by-the-backend-and-never-shows-placeholder-only-content-to-the-user",
+      "featureTitle": "Update the frontend Study article flow (Wrong Answers Review → Study Article View) so it reliably displays the substantive article returned by the backend and never shows placeholder-only content to the user.",
       "files": [
-        "frontend/src/App.tsx",
-        "frontend/src/components/PendingUpdateBanner.tsx"
+        "frontend/src/hooks/useGenerateArticle.ts",
+        "frontend/src/quiz/StudyArticleView.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -18,7 +18,7 @@
         "blob-storage@4.0.0"
       ],
       "testIds": [
-        "REQ-1"
+        "REQ-3"
       ],
       "confidence": "high"
     }
