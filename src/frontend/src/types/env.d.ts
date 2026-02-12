@@ -24,3 +24,4 @@ interface Window {
   };
   __ENV_LOAD_STATUS__?: 'loading' | 'loaded' | 'missing' | 'error';
 }
+

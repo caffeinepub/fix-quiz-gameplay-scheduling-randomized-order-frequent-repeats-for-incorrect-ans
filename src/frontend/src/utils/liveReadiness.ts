@@ -3,6 +3,8 @@
 
 import type { HealthCheckResult } from '../backend';
 
+const PLACEHOLDER_CANISTER_ID = 'PLACEHOLDER_BACKEND_CANISTER_ID';
+
 export interface ReadinessStatus {
   ready: boolean;
   summary: string;
@@ -35,7 +37,7 @@ export function evaluateReadiness(
       details: [
         'The backend canister ID could not be resolved.',
         canisterIdError || 'No canister ID available from any source.',
-        'Required: /env.json must contain a non-empty CANISTER_ID_BACKEND value.',
+        `Required: /env.json must contain a non-empty, non-placeholder CANISTER_ID_BACKEND value (not "${PLACEHOLDER_CANISTER_ID}").`,
         'Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }',
       ],
       error: canisterIdError,

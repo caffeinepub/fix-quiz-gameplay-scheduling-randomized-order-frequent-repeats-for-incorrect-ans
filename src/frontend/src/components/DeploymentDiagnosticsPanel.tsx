@@ -13,7 +13,7 @@ import type { HealthCheckResult } from '../backend';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { AlertCircle, Download, Trash2, X, Activity, CheckCircle, XCircle, Loader2, RefreshCw, Share2, Copy, Rocket } from 'lucide-react';
+import { AlertCircle, Download, Trash2, X, Activity, CheckCircle, XCircle, Loader2, RefreshCw, Share2, Copy, Rocket, ExternalLink, Info } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Textarea } from './ui/textarea';
@@ -28,456 +28,537 @@ export default function DeploymentDiagnosticsPanel({ onClose, focusPublishSectio
   const [healthCheckStatus, setHealthCheckStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [healthCheckResult, setHealthCheckResult] = useState<HealthCheckResult | null>(null);
   const [healthCheckError, setHealthCheckError] = useState<string | null>(null);
-  const [runtimeEnvMessage, setRuntimeEnvMessage] = useState<string>('');
-  const [shareError, setShareError] = useState<string | null>(null);
-  const [shareFallbackText, setShareFallbackText] = useState<string | null>(null);
-  const [publishChecklistError, setPublishChecklistError] = useState<string | null>(null);
-  const [publishChecklistFallbackText, setPublishChecklistFallbackText] = useState<string | null>(null);
   const [connectionInfo, setConnectionInfo] = useState(getActorConnectionInfo());
-  const buildInfo = getBuildInfo();
+  const [isLoadingConnectionInfo, setIsLoadingConnectionInfo] = useState(false);
+  const [runtimeEnvStatus, setRuntimeEnvStatus] = useState(getRuntimeEnvStatusSync());
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'success' | 'error'>('idle');
+  const [copyChecklistStatus, setCopyChecklistStatus] = useState<'idle' | 'copying' | 'success' | 'error'>('idle');
+  const [fallbackText, setFallbackText] = useState<string | null>(null);
+  const [fallbackChecklistText, setFallbackChecklistText] = useState<string | null>(null);
   const publishSectionRef = useRef<HTMLDivElement>(null);
+
+  const buildInfo = getBuildInfo();
 
   // Load async connection info on mount
   useEffect(() => {
-    getActorConnectionInfoAsync().then(setConnectionInfo);
-  }, []);
-
-  // Auto-run health check on mount
-  useEffect(() => {
-    runHealthCheck();
-    // Also check runtime env status
-    const syncStatus = getRuntimeEnvStatusSync();
-    setRuntimeEnvMessage(syncStatus.message);
+    let mounted = true;
+    setIsLoadingConnectionInfo(true);
     
-    // Async detailed check
-    inspectRuntimeEnv().then(status => {
-      if (status.troubleshootingSteps.length > 0) {
-        setRuntimeEnvMessage(status.message);
+    getActorConnectionInfoAsync().then(info => {
+      if (mounted) {
+        setConnectionInfo(info);
+        setIsLoadingConnectionInfo(false);
       }
     });
+
+    return () => { mounted = false; };
   }, []);
 
-  // Focus publish section when requested
+  // Load async runtime env status
+  useEffect(() => {
+    let mounted = true;
+    
+    inspectRuntimeEnv().then(status => {
+      if (mounted) {
+        setRuntimeEnvStatus({
+          canisterIdPresent: status.canisterIdPresent,
+          message: status.message,
+        });
+      }
+    });
+
+    return () => { mounted = false; };
+  }, []);
+
+  // Scroll to publish section if requested
   useEffect(() => {
     if (focusPublishSection && publishSectionRef.current) {
-      // Small delay to ensure DOM is ready
       setTimeout(() => {
         publishSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
   }, [focusPublishSection]);
 
-  useEffect(() => {
-    // Refresh errors every second
-    const interval = setInterval(() => {
-      setErrors(diagnostics.getErrors());
-    }, 1000);
+  const handleRunHealthCheck = async () => {
+    setHealthCheckStatus('testing');
+    setHealthCheckError(null);
+    setHealthCheckResult(null);
 
-    return () => clearInterval(interval);
-  }, []);
+    try {
+      const actor = await createActorWithConfig();
+      const result = await actor.healthCheck();
+      setHealthCheckResult(result);
+      setHealthCheckStatus('success');
+    } catch (error: any) {
+      const stoppedInfo = detectStoppedCanister(error);
+      if (stoppedInfo.isStopped) {
+        setHealthCheckError(formatStoppedCanisterMessage(stoppedInfo));
+      } else {
+        setHealthCheckError(error.message || 'Unknown error');
+      }
+      setHealthCheckStatus('error');
+    }
+  };
 
-  const handleClear = () => {
+  const handleClearErrors = () => {
     diagnostics.clearErrors();
     setErrors([]);
   };
 
-  const handleDownload = () => {
+  const handleDownloadReport = () => {
     const report = diagnostics.getFormattedReport();
-
     const blob = new Blob([report], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `deployment-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    a.download = `diagnostics-${Date.now()}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const runHealthCheck = async () => {
-    setHealthCheckStatus('testing');
-    setHealthCheckError(null);
-    setHealthCheckResult(null);
-
-    try {
-      // Create an anonymous actor for health check (doesn't require authentication)
-      const anonymousActor = await createActorWithConfig();
-      const result = await anonymousActor.healthCheck();
-      setHealthCheckStatus('success');
-      setHealthCheckResult(result);
-    } catch (error: any) {
-      setHealthCheckStatus('error');
-      const stoppedInfo = detectStoppedCanister(error);
-      
-      if (stoppedInfo.isStopped) {
-        const stoppedMessage = formatStoppedCanisterMessage(stoppedInfo);
-        setHealthCheckError(stoppedMessage);
-        diagnostics.captureError(
-          error,
-          'DeploymentDiagnosticsPanel - Backend health check failed (canister stopped)',
-          'runtime',
-          'canisterStopped',
-          stoppedInfo.canisterId || undefined
-        );
-      } else {
-        setHealthCheckError(error.message || 'Unknown error occurred');
-        diagnostics.captureError(
-          error,
-          'DeploymentDiagnosticsPanel - Backend health check failed',
-          'runtime'
-        );
-      }
-    }
-  };
-
-  const handleRunHealthCheck = async () => {
-    await runHealthCheck();
-  };
-
-  const handleForceRefresh = () => {
-    diagnostics.captureForceRefresh('User-initiated force refresh from Diagnostics Panel');
+  const handleHardRefresh = () => {
     refreshToLatestBuild();
   };
 
-  const handleCopyLiveVerificationInfo = async () => {
-    setShareError(null);
-    setShareFallbackText(null);
+  const handleCopyVerificationInfo = async () => {
+    setCopyStatus('copying');
+    setFallbackText(null);
 
     try {
-      const verificationText = await shareLiveVerificationInfo(
-        buildInfo,
-        healthCheckResult,
-        healthCheckError
-      );
-
-      await navigator.clipboard.writeText(verificationText);
-      // Success - could show a toast here
-      alert('Live verification info copied to clipboard!');
-    } catch (error: any) {
-      // Either generation or clipboard write failed
-      try {
-        const verificationText = await shareLiveVerificationInfo(
-          buildInfo,
-          healthCheckResult,
-          healthCheckError
-        );
-        setShareError('Could not copy to clipboard. Please copy the text below manually:');
-        setShareFallbackText(verificationText);
-      } catch (genError: any) {
-        setShareError('Failed to generate verification info: ' + genError.message);
+      const verificationInfo = await shareLiveVerificationInfo(buildInfo, healthCheckResult, healthCheckError);
+      
+      // Try clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(verificationInfo);
+          setCopyStatus('success');
+          setTimeout(() => setCopyStatus('idle'), 2000);
+          return;
+        } catch (clipboardError) {
+          // Clipboard failed, fall through to fallback
+        }
       }
+
+      // Fallback: show textarea
+      setFallbackText(verificationInfo);
+      setCopyStatus('idle');
+    } catch (error) {
+      setCopyStatus('error');
+      setTimeout(() => setCopyStatus('idle'), 2000);
     }
   };
 
   const handleCopyPublishChecklist = async () => {
-    setPublishChecklistError(null);
-    setPublishChecklistFallbackText(null);
+    setCopyChecklistStatus('copying');
+    setFallbackChecklistText(null);
 
     try {
-      const checklistText = await formatPublishChecklist(buildInfo);
-      await navigator.clipboard.writeText(checklistText);
-      alert('Publish checklist copied to clipboard!');
-    } catch (error: any) {
-      // Either generation or clipboard write failed
-      try {
-        const checklistText = await formatPublishChecklist(buildInfo);
-        setPublishChecklistError('Could not copy to clipboard. Please copy the text below manually:');
-        setPublishChecklistFallbackText(checklistText);
-      } catch (genError: any) {
-        setPublishChecklistError('Failed to generate checklist: ' + genError.message);
+      const checklist = await formatPublishChecklist(buildInfo);
+      
+      // Try clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(checklist);
+          setCopyChecklistStatus('success');
+          setTimeout(() => setCopyChecklistStatus('idle'), 2000);
+          return;
+        } catch (clipboardError) {
+          // Clipboard failed, fall through to fallback
+        }
       }
+
+      // Fallback: show textarea
+      setFallbackChecklistText(checklist);
+      setCopyChecklistStatus('idle');
+    } catch (error) {
+      setCopyChecklistStatus('error');
+      setTimeout(() => setCopyChecklistStatus('idle'), 2000);
     }
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'actorInit':
-        return 'destructive';
-      case 'runtime':
-        return 'default';
-      case 'unhandledRejection':
-        return 'secondary';
-      case 'forceRefresh':
-        return 'outline';
-      default:
-        return 'outline';
-    }
-  };
-
-  // Evaluate readiness
-  const readiness = evaluateReadiness(
+  const readinessStatus = evaluateReadiness(
     connectionInfo.canisterId,
     connectionInfo.canisterIdSource,
     connectionInfo.canisterIdResolutionError,
-    healthCheckResult,
-    healthCheckError
+    healthCheckStatus === 'success' ? healthCheckResult : null,
+    healthCheckStatus === 'error' ? healthCheckError : null
   );
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <CardHeader className="shrink-0">
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-primary" />
-                Deployment Diagnostics
-              </CardTitle>
-              <CardDescription className="mt-2 space-y-1">
-                <div>Version: {buildInfo.version} | Environment: {buildInfo.environment}</div>
-                <div className="text-xs">Build: {buildInfo.timestamp}</div>
-                <div className="text-xs">Deployment ID: {buildInfo.deploymentId}</div>
-                <div className="text-xs">
-                  Location: {window.location.origin}{window.location.pathname}
-                  {window.location.hash && ` (${window.location.hash})`}
-                </div>
-                <div className="text-xs">
-                  Backend Canister ID: {connectionInfo.canisterId || '(not resolved)'} 
-                  {' '}(source: {connectionInfo.canisterIdSource})
-                </div>
-                <div className="text-xs">
-                  Sources Attempted: {connectionInfo.canisterIdSourcesAttempted.join(', ')}
-                </div>
-                {connectionInfo.canisterIdResolutionError && (
-                  <div className="text-xs text-destructive">
-                    Resolution Error: {connectionInfo.canisterIdResolutionError}
-                  </div>
-                )}
-              </CardDescription>
-            </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+    <Card className="w-full max-w-4xl mx-auto shadow-cyber">
+      <CardHeader className="border-b border-border">
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="text-2xl mb-2">Deployment Diagnostics & Publishing</CardTitle>
+            <CardDescription>
+              View deployment status, verify configuration, and access publishing instructions
+            </CardDescription>
           </div>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex flex-wrap gap-2 mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRunHealthCheck}
-              disabled={healthCheckStatus === 'testing'}
-            >
-              {healthCheckStatus === 'testing' ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Activity className="h-4 w-4 mr-2" />
-              )}
-              Run Backend Health Check
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyLiveVerificationInfo}
-            >
-              <Share2 className="h-4 w-4 mr-2" />
-              Copy Live Verification Info
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleForceRefresh}
-              className="bg-primary hover:bg-primary/90"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Force Refresh
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download Report
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleClear}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear Errors
-            </Button>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+      </CardHeader>
+
+      <ScrollArea className="max-h-[70vh]">
+        <CardContent className="space-y-6 pt-6">
+          {/* Build Information */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Build Information
+            </h3>
+            <div className="bg-muted/50 p-4 rounded-lg space-y-2 text-sm font-mono">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Version:</span>
+                <span className="font-semibold">{buildInfo.version}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Timestamp:</span>
+                <span>{buildInfo.timestamp}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Deployment ID:</span>
+                <span>{buildInfo.deploymentId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Environment:</span>
+                <span>{buildInfo.environment}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Build ID:</span>
+                <span className="text-xs">{buildInfo.buildId}</span>
+              </div>
+            </div>
           </div>
 
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-6">
-              {/* Live Readiness Section */}
-              <div>
-                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                  {readiness.ready ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
+          {/* Backend Connection */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Backend Connection
+            </h3>
+            <div className="bg-muted/50 p-4 rounded-lg space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Backend Canister ID:</span>
+                <span className="font-mono font-semibold">
+                  {isLoadingConnectionInfo ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading...
+                    </span>
                   ) : (
-                    <XCircle className="h-5 w-5 text-destructive" />
+                    connectionInfo.canisterId || '(not resolved)'
                   )}
-                  Live Readiness
-                </h3>
-                <Alert variant={readiness.ready ? 'default' : 'destructive'}>
-                  <AlertTitle>{readiness.summary}</AlertTitle>
-                  <AlertDescription className="mt-2">
-                    <ul className="list-disc list-inside space-y-1 text-sm">
-                      {readiness.details.map((detail, idx) => (
-                        <li key={idx}>{detail}</li>
-                      ))}
-                    </ul>
-                    {readiness.healthCheckResult && (
-                      <div className="mt-3 text-xs font-mono bg-muted p-2 rounded">
-                        <div>Backend Version: {readiness.healthCheckResult.backendVersion}</div>
-                        <div>System Time: {readiness.healthCheckResult.systemTime}</div>
-                      </div>
-                    )}
-                    {!connectionInfo.canisterId && (
-                      <div className="mt-3 p-3 bg-destructive/10 rounded border border-destructive/20">
-                        <div className="font-semibold text-sm mb-2">Required Configuration:</div>
-                        <div className="text-xs mb-2">
-                          Your /env.json file must contain a non-empty CANISTER_ID_BACKEND value:
-                        </div>
-                        <pre className="text-xs bg-background p-2 rounded border overflow-x-auto">
-{`{
-  "CANISTER_ID_BACKEND": "your-backend-canister-id"
-}`}
-                        </pre>
-                      </div>
-                    )}
-                  </AlertDescription>
-                </Alert>
+                </span>
               </div>
-
-              {/* Runtime Configuration Section */}
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Runtime Configuration</h3>
-                <Alert>
-                  <AlertDescription>
-                    <div className="text-sm space-y-2">
-                      <div>{runtimeEnvMessage}</div>
-                      {!connectionInfo.canisterId && (
-                        <div className="mt-2 p-2 bg-muted rounded">
-                          <div className="font-semibold mb-1">Troubleshooting:</div>
-                          <ul className="list-disc list-inside space-y-1 text-xs">
-                            <li>Ensure /env.json exists in your deployed frontend assets</li>
-                            <li>Verify /env.json contains a non-empty CANISTER_ID_BACKEND value</li>
-                            <li>Check browser network tab to confirm /env.json is accessible</li>
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </AlertDescription>
-                </Alert>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Resolution Source:</span>
+                <span className="font-mono text-xs">{connectionInfo.canisterIdSource}</span>
               </div>
-
-              {/* Publish Guidance Section */}
-              <div ref={publishSectionRef}>
-                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                  <Rocket className="h-5 w-5 text-primary" />
-                  Publish to Live Canister
-                </h3>
-                <Alert>
-                  <AlertDescription>
-                    <div className="text-sm space-y-3">
-                      <p>
-                        This application cannot self-publish. To deploy to a live canister on the Internet Computer:
-                      </p>
-                      <ol className="list-decimal list-inside space-y-2 ml-2">
-                        <li>Copy the publish checklist using the button below</li>
-                        <li>Return to the Caffeine editor</li>
-                        <li>Follow the checklist instructions to publish via the editor</li>
-                        <li>After publishing, update /env.json with your backend canister ID</li>
-                        <li>Verify the deployment using the health check and verification tools</li>
-                      </ol>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyPublishChecklist}
-                        className="w-full"
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy Publish Checklist
-                      </Button>
-                      {publishChecklistError && (
-                        <div className="mt-2">
-                          <div className="text-xs text-destructive mb-1">{publishChecklistError}</div>
-                          {publishChecklistFallbackText && (
-                            <Textarea
-                              value={publishChecklistFallbackText}
-                              readOnly
-                              className="font-mono text-xs h-64 mt-2"
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </AlertDescription>
-                </Alert>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Network:</span>
+                <Badge variant={connectionInfo.network === 'mainnet' ? 'default' : 'secondary'}>
+                  {connectionInfo.network}
+                </Badge>
               </div>
-
-              {/* Share Verification Info Fallback */}
-              {shareError && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Live Verification Info</h3>
-                  <Alert variant="destructive">
-                    <AlertDescription>
-                      <div className="text-sm space-y-2">
-                        <div>{shareError}</div>
-                        {shareFallbackText && (
-                          <Textarea
-                            value={shareFallbackText}
-                            readOnly
-                            className="font-mono text-xs h-64 mt-2"
-                          />
-                        )}
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )}
-
-              {/* Captured Errors Section */}
-              {errors.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Captured Errors ({errors.length})</h3>
-                  <div className="space-y-2">
-                    {errors.map((error, index) => (
-                      <Alert key={`${error.timestamp}-${index}`} variant="destructive">
-                        <AlertTitle className="flex items-center gap-2">
-                          <Badge variant={getTypeColor(error.type)}>{error.type}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(error.timestamp).toLocaleString()}
-                          </span>
-                        </AlertTitle>
-                        <AlertDescription>
-                          <div className="text-sm space-y-1">
-                            <div className="font-semibold">{error.context}</div>
-                            <div className="text-xs font-mono bg-muted p-2 rounded overflow-x-auto">
-                              {error.message}
-                            </div>
-                            {error.detectedIssue && (
-                              <div className="mt-2 p-2 bg-destructive/10 rounded border border-destructive/20">
-                                <div className="font-semibold text-xs">⚠️ Detected Issue:</div>
-                                <div className="text-xs mt-1">{error.detectedIssue}</div>
-                                {error.detectedCanisterId && (
-                                  <div className="text-xs mt-1 font-mono">
-                                    Canister: {error.detectedCanisterId}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {error.metadata && (
-                              <details className="text-xs">
-                                <summary className="cursor-pointer hover:underline">
-                                  Connection Details
-                                </summary>
-                                <div className="mt-1 font-mono bg-muted p-2 rounded">
-                                  <div>Host: {error.metadata.host}</div>
-                                  <div>Network: {error.metadata.network}</div>
-                                  <div>Canister ID: {error.metadata.canisterId || '(not resolved)'}</div>
-                                  <div>Source: {error.metadata.canisterIdSource}</div>
-                                </div>
-                              </details>
-                            )}
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    ))}
-                  </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Host:</span>
+                <span className="font-mono text-xs">{connectionInfo.host}</span>
+              </div>
+              {connectionInfo.canisterIdResolutionError && (
+                <div className="pt-2 border-t border-border">
+                  <span className="text-destructive text-xs">
+                    Error: {connectionInfo.canisterIdResolutionError}
+                  </span>
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
+
+          {/* Runtime Environment Status */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Runtime Environment Status
+            </h3>
+            <Alert variant={runtimeEnvStatus.canisterIdPresent ? 'default' : 'destructive'}>
+              {runtimeEnvStatus.canisterIdPresent ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <AlertCircle className="h-4 w-4" />
+              )}
+              <AlertTitle>
+                {runtimeEnvStatus.canisterIdPresent ? 'Configured' : 'Configuration Issue'}
+              </AlertTitle>
+              <AlertDescription className="text-sm">
+                {runtimeEnvStatus.message}
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          {/* Backend Health Check */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Backend Health Check
+            </h3>
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleRunHealthCheck}
+                  disabled={healthCheckStatus === 'testing'}
+                  size="sm"
+                  variant="outline"
+                >
+                  {healthCheckStatus === 'testing' ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Run Health Check
+                    </>
+                  )}
+                </Button>
+                {healthCheckStatus !== 'idle' && (
+                  <Badge variant={healthCheckStatus === 'success' ? 'default' : 'destructive'}>
+                    {healthCheckStatus === 'success' ? 'Passed' : 'Failed'}
+                  </Badge>
+                )}
+              </div>
+
+              {healthCheckStatus === 'success' && healthCheckResult && (
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertTitle>Health Check Passed</AlertTitle>
+                  <AlertDescription className="text-sm space-y-1">
+                    <div>Backend Version: {healthCheckResult.backendVersion.toString()}</div>
+                    <div>System Time: {new Date(Number(healthCheckResult.systemTime) / 1_000_000).toLocaleString()}</div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {healthCheckStatus === 'error' && healthCheckError && (
+                <Alert variant="destructive">
+                  <XCircle className="h-4 w-4" />
+                  <AlertTitle>Health Check Failed</AlertTitle>
+                  <AlertDescription className="text-sm">
+                    {healthCheckError}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </div>
+
+          {/* Live Readiness */}
+          <div ref={publishSectionRef}>
+            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Rocket className="h-5 w-5" />
+              Publishing & Live Readiness
+            </h3>
+            
+            <Alert variant={readinessStatus.ready ? 'default' : 'destructive'} className="mb-4">
+              {readinessStatus.ready ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <AlertCircle className="h-4 w-4" />
+              )}
+              <AlertTitle className="font-semibold">
+                {readinessStatus.ready ? 'Ready for Live' : 'Not Ready for Live'}
+              </AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p className="text-sm">{readinessStatus.summary}</p>
+                {readinessStatus.details && readinessStatus.details.length > 0 && (
+                  <ul className="text-sm space-y-1 pl-4 list-disc">
+                    {readinessStatus.details.map((detail, idx) => (
+                      <li key={idx}>{detail}</li>
+                    ))}
+                  </ul>
+                )}
+              </AlertDescription>
+            </Alert>
+
+            <Alert className="mb-4 border-primary/50 bg-primary/5">
+              <Info className="h-4 w-4" />
+              <AlertTitle className="font-semibold">Important: Publishing via Caffeine Editor</AlertTitle>
+              <AlertDescription className="space-y-2 text-sm">
+                <p>
+                  This app <strong>cannot self-publish</strong>. Publishing must be done through the <strong>Caffeine editor</strong>.
+                </p>
+                <p>
+                  This panel provides diagnostics and verification tools to help you confirm a successful deployment, 
+                  but the actual publish action happens in the editor.
+                </p>
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleCopyPublishChecklist}
+                  disabled={copyChecklistStatus === 'copying'}
+                  size="sm"
+                  variant="default"
+                >
+                  {copyChecklistStatus === 'copying' ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Copying...
+                    </>
+                  ) : copyChecklistStatus === 'success' ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Publishing Checklist
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={handleCopyVerificationInfo}
+                  disabled={copyStatus === 'copying'}
+                  size="sm"
+                  variant="outline"
+                >
+                  {copyStatus === 'copying' ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Copying...
+                    </>
+                  ) : copyStatus === 'success' ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Copy Verification Info
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => window.open('/PUBLISHING.md', '_blank')}
+                  size="sm"
+                  variant="outline"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Full Guide
+                </Button>
+              </div>
+
+              {fallbackChecklistText && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Clipboard unavailable. Copy the checklist manually:
+                  </p>
+                  <Textarea
+                    value={fallbackChecklistText}
+                    readOnly
+                    className="font-mono text-xs h-64"
+                    onClick={(e) => e.currentTarget.select()}
+                  />
+                </div>
+              )}
+
+              {fallbackText && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Clipboard unavailable. Copy the verification info manually:
+                  </p>
+                  <Textarea
+                    value={fallbackText}
+                    readOnly
+                    className="font-mono text-xs h-64"
+                    onClick={(e) => e.currentTarget.select()}
+                  />
+                </div>
+              )}
+
+              <div className="bg-muted/30 p-4 rounded-lg space-y-3 text-sm">
+                <h4 className="font-semibold">Quick Publishing Steps:</h4>
+                <ol className="space-y-2 pl-5 list-decimal">
+                  <li>Return to the <strong>Caffeine editor</strong></li>
+                  <li>Click the <strong>"Publish to Live"</strong> button</li>
+                  <li>Ensure <code className="bg-muted px-1 py-0.5 rounded text-xs">/env.json</code> is configured with your backend canister ID (not placeholder)</li>
+                  <li>Wait for deployment to complete</li>
+                  <li>Open the live URL and verify functionality</li>
+                  <li>Use this diagnostics panel to confirm readiness</li>
+                </ol>
+                <p className="text-muted-foreground pt-2">
+                  For detailed instructions, copy the publishing checklist above or view the full guide.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Error Log */}
+          {errors.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                Error Log ({errors.length})
+              </h3>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Button onClick={handleDownloadReport} size="sm" variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Report
+                  </Button>
+                  <Button onClick={handleClearErrors} size="sm" variant="outline">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear Errors
+                  </Button>
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {errors.map((error, idx) => (
+                    <Alert key={idx} variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle className="text-sm font-semibold">
+                        {error.context || 'Error'}
+                        {error.detectedIssue && (
+                          <Badge variant="destructive" className="ml-2">
+                            {error.detectedIssue}
+                          </Badge>
+                        )}
+                      </AlertTitle>
+                      <AlertDescription className="text-xs font-mono mt-1">
+                        {error.message}
+                        {error.detectedCanisterId && (
+                          <div className="mt-1 text-xs">
+                            Canister: {error.detectedCanisterId}
+                          </div>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-4 border-t border-border">
+            <Button onClick={handleHardRefresh} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Hard Refresh
+            </Button>
+            <Button onClick={onClose} variant="default" size="sm">
+              Close
+            </Button>
+          </div>
         </CardContent>
-      </Card>
-    </div>
+      </ScrollArea>
+    </Card>
   );
 }

@@ -1,26 +1,68 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Ensure Study Article flow renders real backend article content and blocks placeholder content",
+  "title": "Disable Study Articles in Wrong Answers Review and harden runtime configuration for successful builds/deploys",
   "requirements": [
     {
-      "id": "REQ-3",
-      "summary": "Harden the Study article flow so it renders the backend-provided article reliably and shows an explicit error when generation fails or returns placeholder-only content.",
+      "id": "REQ-1",
+      "summary": "Remove Study Article access and data flow from the Wrong Answers Review experience.",
       "acceptanceCriteria": [
-        "Clicking the Study button for a wrong-answered question shows the full article content returned by the backend",
-        "The Study article view shows a clear error state if article generation fails (no silent fallback to placeholder text)",
-        "The Study article view continues to show the question reference and article title/content in a readable, scrollable layout as it does today"
+        "The Wrong Answers Review screen (frontend/src/quiz/WrongAnswersReview.tsx) contains no UI affordance to open a study article (no click-to-open behavior, buttons, links, or navigation).",
+        "The app no longer navigates to the Study Article view from any wrong-answers review action; the 'studyArticle' view is not reachable through the wrong-answer review flow.",
+        "Wrong answer review entries no longer carry or rely on a 'studyArticle' field in the frontend data flow (update frontend/src/quiz/wrongAnswerTypes.ts and the place where wrong-answers are assembled in frontend/src/quiz/QuizGameplay.tsx accordingly).",
+        "Any now-unused state, handlers, imports, and view routing related to opening StudyArticleView from wrong-answer review are removed from frontend/src/App.tsx (e.g., selectedStudyQuestion, handleStudyQuestion, and the 'studyArticle' view branch), without breaking other views."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useGenerateArticle.ts",
+          "path": "frontend/src/quiz/wrongAnswerTypes.ts",
           "operation": "modify",
-          "description": "Add client-side validation for the returned Article so placeholder-only content (e.g., the known placeholder sentence starting with \"This is a generated long-form educational article...\") is treated as an error by throwing, ensuring the UI never renders placeholder content and instead enters an explicit error state."
+          "description": "Remove the optional studyArticle field from WrongAnswerEntry so wrong-answer review entries no longer carry Study Article data."
         },
         {
-          "path": "frontend/src/quiz/StudyArticleView.tsx",
+          "path": "frontend/src/quiz/QuizGameplay.tsx",
           "operation": "modify",
-          "description": "Update the Study Article view to handle the hook’s validation/errors cleanly: keep the existing readable, scrollable layout for question reference + article title/content; ensure error copy is clear and in English; and ensure there is no fallback rendering path that could display placeholder-only content when generation fails."
+          "description": "Update wrongAnswersList assembly to stop reading/propagating Question.studyArticle into WrongAnswerEntry; ensure the wrong-answers data passed to results/review no longer includes study-article content."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Remove StudyArticleView import and all wrong-answer-review-driven routing/state/handlers for study articles (e.g., selectedStudyQuestion, handleStudyQuestion, 'studyArticle' in the View union, and the 'studyArticle' rendering branch) so the study-article view is not reachable from the wrong-answers review flow."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Fix frontend runtime configuration/deployment issues so builds succeed and missing/placeholder canister configuration is surfaced clearly.",
+      "acceptanceCriteria": [
+        "The project builds successfully without triggering a configuration error.",
+        "The deployed preview can initialize the backend actor (i.e., does not fail immediately due to missing/invalid runtime configuration).",
+        "If the runtime configuration (/frontend/public/env.json) contains the placeholder canister id value (\"PLACEHOLDER_BACKEND_CANISTER_ID\"), the UI clearly surfaces this as a configuration problem (via existing diagnostics/connection error UI) and provides actionable steps, rather than failing silently."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/declarations/backend/index.ts",
+          "operation": "create",
+          "description": "Add a checked-in backend declarations module that exports an idlFactory compatible with the app’s backendInterface, so production builds/deployments don’t depend on locally-generated dfx artifacts."
+        },
+        {
+          "path": "frontend/src/config/index.ts",
+          "operation": "modify",
+          "description": "Stop relying on a hard-coded dynamic import path to dfx-generated declarations; instead load the idlFactory from the checked-in frontend/src/declarations/backend module (and keep a safe fallback/error if it cannot be loaded)."
+        },
+        {
+          "path": "frontend/src/utils/canisterIdResolution.ts",
+          "operation": "modify",
+          "description": "Detect placeholder/invalid CANISTER_ID_BACKEND values early and throw a clear, actionable configuration error message (explicitly calling out the PLACEHOLDER_BACKEND_CANISTER_ID case) so the existing actor init error UI shows helpful guidance."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Enhance the existing actor initialization error view to recognize configuration-related failures (especially the placeholder canister id case) and present actionable steps, aligning with the current diagnostics/connection error UI rather than failing silently."
+        },
+        {
+          "path": "frontend/public/env.json",
+          "operation": "modify",
+          "description": "Keep env.json valid and deploy-safe; ensure the placeholder guidance remains accurate and that the file structure is compatible with the runtime loader so deployment builds do not fail due to malformed config."
         }
       ]
     }

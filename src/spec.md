@@ -1,11 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Replace placeholder Study articles with substantive generated/stored article content, persist articles per question, and ensure the frontend reliably displays the real article (with clear errors on failure).
+**Goal:** Remove Study Article access from the Wrong Answers Review flow and fix the configuration issue blocking successful build/deploy.
 
 **Planned changes:**
-- Update backend `generateArticle(questionText)` to return a non-placeholder study article with a title and multi-section content suitable for studying the specific question.
-- Add backend persistence so generated articles are stored per question and returned consistently on subsequent requests, including across canister upgrades.
-- Update the frontend Study article flow (Wrong Answers Review → Study Article View) to display the backend-returned article content and show a clear error state if generation fails (no placeholder-only fallback).
+- Remove all UI affordances and click-to-open behavior for Study Articles from `frontend/src/quiz/WrongAnswersReview.tsx`.
+- Remove the `studyArticle` field from wrong-answer review data structures and assembly flow (update `frontend/src/quiz/wrongAnswerTypes.ts` and the wrong-answers creation logic in `frontend/src/quiz/QuizGameplay.tsx`).
+- Remove now-unused state/handlers/imports and view routing that enables opening `StudyArticleView` from wrong-answers review in `frontend/src/App.tsx` (including the `studyArticle` view branch), without impacting other views.
+- Fix the project runtime/build configuration so builds succeed and deployed preview can initialize the backend actor; ensure the UI clearly surfaces a misconfigured `frontend/public/env.json` placeholder canister id (`PLACEHOLDER_BACKEND_CANISTER_ID`) as an actionable configuration problem.
 
-**User-visible outcome:** When reviewing wrong answers, clicking **Study** shows a readable, scrollable, substantive study article (title + multiple sections) for that question, and the article remains the same when revisited; if generation fails, the user sees an explicit error instead of placeholder text.
+**User-visible outcome:** Users can review wrong answers without any option to open Study Articles, and the app builds/deploys successfully with clear feedback if runtime canister configuration is still a placeholder.

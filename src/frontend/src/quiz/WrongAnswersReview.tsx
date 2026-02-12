@@ -1,17 +1,16 @@
 import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { ScrollArea } from '../components/ui/scroll-area';
 import type { WrongAnswerEntry } from './wrongAnswerTypes';
 
 interface WrongAnswersReviewProps {
   wrongAnswers: WrongAnswerEntry[];
   onBack: () => void;
-  onStudy?: (entry: WrongAnswerEntry) => void;
 }
 
-export default function WrongAnswersReview({ wrongAnswers, onBack, onStudy }: WrongAnswersReviewProps) {
+export default function WrongAnswersReview({ wrongAnswers, onBack }: WrongAnswersReviewProps) {
   // Handle Escape key press
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -51,33 +50,21 @@ export default function WrongAnswersReview({ wrongAnswers, onBack, onStudy }: Wr
         <CardContent>
           <ScrollArea className="h-[60vh]">
             <div className="space-y-4 pr-4">
-              {wrongAnswers.map((entry, index) => (
-                <div
-                  key={index}
-                  className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex gap-3 items-start">
-                    <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive font-semibold">
-                      {entry.questionNumber}
+              {wrongAnswers.map((entry) => (
+                <Card key={entry.questionGlobalIndex} className="border-2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold text-muted-foreground mb-2">
+                          Question {entry.questionNumber}
+                        </div>
+                        <p className="text-base leading-relaxed">
+                          {entry.questionText}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm sm:text-base leading-relaxed break-words">
-                        {entry.questionText}
-                      </p>
-                    </div>
-                    {onStudy && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onStudy(entry)}
-                        className="shrink-0 gap-2"
-                      >
-                        <BookOpen className="h-4 w-4" />
-                        <span className="hidden sm:inline">Study</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                  </CardHeader>
+                </Card>
               ))}
             </div>
           </ScrollArea>

@@ -114,6 +114,7 @@ export interface Question {
     hint?: string;
     text: string;
     correctAnswer: bigint;
+    studyArticle?: string;
     imageUrl?: ExternalBlob;
 }
 export interface UserProfile {
@@ -163,7 +164,7 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     saveQuestions(quizId: QuizId, questionsInput: Array<Question>): Promise<void>;
     setBlockName(quizId: QuizId, blockIndex: bigint, blockName: string): Promise<void>;
-    writeArticle(_articleId: string): Promise<void>;
+    writeArticle(_questionId: string): Promise<void>;
 }
 import type { ExternalBlob as _ExternalBlob, Question as _Question, StateSnapshot as _StateSnapshot, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -698,12 +699,14 @@ async function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promi
     hint: [] | [string];
     text: string;
     correctAnswer: bigint;
+    studyArticle: [] | [string];
     imageUrl: [] | [_ExternalBlob];
 }): Promise<{
     answers: Array<string>;
     hint?: string;
     text: string;
     correctAnswer: bigint;
+    studyArticle?: string;
     imageUrl?: ExternalBlob;
 }> {
     return {
@@ -711,6 +714,7 @@ async function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promi
         hint: record_opt_to_undefined(from_candid_opt_n21(_uploadFile, _downloadFile, value.hint)),
         text: value.text,
         correctAnswer: value.correctAnswer,
+        studyArticle: record_opt_to_undefined(from_candid_opt_n21(_uploadFile, _downloadFile, value.studyArticle)),
         imageUrl: record_opt_to_undefined(await from_candid_opt_n22(_uploadFile, _downloadFile, value.imageUrl))
     };
 }
@@ -770,12 +774,14 @@ async function to_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise
     hint?: string;
     text: string;
     correctAnswer: bigint;
+    studyArticle?: string;
     imageUrl?: ExternalBlob;
 }): Promise<{
     answers: Array<string>;
     hint: [] | [string];
     text: string;
     correctAnswer: bigint;
+    studyArticle: [] | [string];
     imageUrl: [] | [_ExternalBlob];
 }> {
     return {
@@ -783,6 +789,7 @@ async function to_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise
         hint: value.hint ? candid_some(value.hint) : candid_none(),
         text: value.text,
         correctAnswer: value.correctAnswer,
+        studyArticle: value.studyArticle ? candid_some(value.studyArticle) : candid_none(),
         imageUrl: value.imageUrl ? candid_some(await to_candid_ExternalBlob_n11(_uploadFile, _downloadFile, value.imageUrl)) : candid_none()
     };
 }

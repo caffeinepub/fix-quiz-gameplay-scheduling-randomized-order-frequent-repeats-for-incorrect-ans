@@ -33,6 +33,7 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange, onEditQ
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null);
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<number>(10);
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
+  const [sessionQuestionIndices, setSessionQuestionIndices] = useState<number[]>([]);
   const [scheduler, setScheduler] = useState<AdaptiveScheduler | null>(null);
   const [currentQuestionId, setCurrentQuestionId] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -102,11 +103,14 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange, onEditQ
     if (selectedBlockIndex === null) return;
 
     const blockQuestions = getQuestionsForBlock(allQuestions, selectedBlockIndex);
+    const blockStartIndex = selectedBlockIndex * 100;
     const subsetIndices = createRandomSubset(blockQuestions.length, selectedQuestionCount);
     const subset = subsetIndices.map(idx => blockQuestions[idx]);
+    const globalIndices = subsetIndices.map(idx => blockStartIndex + idx);
     const newScheduler = new AdaptiveScheduler(subset.length);
 
     setSessionQuestions(subset);
+    setSessionQuestionIndices(globalIndices);
     setScheduler(newScheduler);
     setCurrentQuestionId(0);
     setSelectedAnswer(null);
@@ -143,6 +147,7 @@ export default function QuizGameplay({ quizId, onComplete, onStepChange, onEditQ
           wrongAnswersList.push({
             questionNumber: qId + 1,
             questionText: sessionQuestions[qId].text,
+            questionGlobalIndex: sessionQuestionIndices[qId],
           });
         }
         if (perf.correctCount > 0) {

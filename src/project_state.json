@@ -1,20 +1,26 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Add real AI-generated study articles for wrong-answered questions (replace placeholder content shown after clicking the Study icon).",
-  "architectural_notes": [
-    "Study-article page currently shows placeholder text; implement backend/content generation pipeline to produce and store real long-form educational articles per question."
-  ],
+  "summary": "Application with a 'wrong question review' feature; user requests removing the educational article function from that review and resolving a deployment/build configuration error.",
+  "architectural_notes": [],
   "known_issues": [
-    "Study icon appears, but study-article content is only placeholder text (no real AI-generated article)."
+    "Build/deployment is failing due to a configuration error (requires fix before rerunning build)."
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-update-the-frontend-study-article-flow-wrong-answers-review-study-article-view-so-it-reliably-displays-the-substantive-article-returned-by-the-backend-and-never-shows-placeholder-only-content-to-the-user",
-      "title": "Update the frontend Study article flow (Wrong Answers Review → Study Article View) so it reliably displays the substantive article returned by the backend and never shows placeholder-only content to the user.",
+      "id": "feature-remove-the-educational-study-article-functionality-from-the-wrong-answers-review-flow-so-users-cannot-open-or-view-a-study-article-from-the-wrong-question-review-experience",
+      "title": "Remove the educational/study-article functionality from the Wrong Answers Review flow so users cannot open or view a Study Article from the wrong-question review experience.",
       "reqIds": [
-        "REQ-3"
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-configuration-issue-preventing-builds-deployments-from-running-successfully-and-ensure-the-app-can-be-rebuilt-and-redeployed-after-the-fix",
+      "title": "Fix the configuration issue preventing builds/deployments from running successfully, and ensure the app can be rebuilt and redeployed after the fix.",
+      "reqIds": [
+        "REQ-2"
       ],
       "version": 1
     }
@@ -22,28 +28,18 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Implement actual AI-generated study articles content for wrong-answered questions (replace current placeholder article text shown via Study icon).",
+      "summary": "Remove the educational article function from the 'wrong question review' section.",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Replace the placeholder implementation of backend article generation so that calling `generateArticle(questionText)` returns a substantive study article (not the current placeholder text) with multiple sections (e.g., short summary, key concepts, reasoning steps, common pitfalls, and a short self-check), suitable for studying the specific question.",
-      "reqIds": [
-        "REQ-1"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Add backend persistence for generated/stored articles so that once an article is created for a question, subsequent requests for the same question return the same saved article instead of re-generating placeholder content on each call.",
-      "reqIds": [
-        "REQ-2"
-      ],
+      "summary": "Fix the build/deployment configuration error and rerun the build.",
+      "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Replace placeholder Study articles with real generated/stored article content",
+  "projectName": "Remove study-article access from Wrong Answers Review and resolve deployment configuration failure",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

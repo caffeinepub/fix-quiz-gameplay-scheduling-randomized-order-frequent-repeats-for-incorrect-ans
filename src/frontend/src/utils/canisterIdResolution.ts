@@ -1,11 +1,24 @@
 // Shared backend canister ID resolution with source tracking
 // Tries multiple sources in priority order and reports which source was used
 
+const PLACEHOLDER_CANISTER_ID = 'PLACEHOLDER_BACKEND_CANISTER_ID';
+
 export interface CanisterIdResolution {
   canisterId: string | null;
   source: 'import.meta.env' | 'window.__ENV__' | 'declarations' | 'url-fallback' | 'none';
   sourcesAttempted: string[];
   error?: string;
+}
+
+/**
+ * Checks if a canister ID value is valid (non-empty and not a placeholder).
+ */
+function isValidCanisterId(value: string | undefined | null): boolean {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed === PLACEHOLDER_CANISTER_ID) return false;
+  return true;
 }
 
 /**
@@ -34,7 +47,7 @@ async function tryLoadCanisterIdFromDeclarations(): Promise<string | null> {
       canisterIds.backend?.local ||
       canisterIds.backend;
     
-    if (backendId && typeof backendId === 'string' && backendId.trim()) {
+    if (isValidCanisterId(backendId)) {
       return backendId.trim();
     }
     
@@ -63,9 +76,9 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
     import.meta.env.VITE_CANISTER_ID_BACKEND ||
     import.meta.env.VITE_BACKEND_CANISTER_ID;
   
-  if (viteCanisterId && typeof viteCanisterId === 'string' && viteCanisterId.trim()) {
+  if (isValidCanisterId(viteCanisterId)) {
     return {
-      canisterId: viteCanisterId.trim(),
+      canisterId: (viteCanisterId as string).trim(),
       source: 'import.meta.env',
       sourcesAttempted,
     };
@@ -76,9 +89,9 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
   try {
     const envJson = window.__ENV__;
     const runtimeCanisterId = envJson?.CANISTER_ID_BACKEND;
-    if (runtimeCanisterId && typeof runtimeCanisterId === 'string' && runtimeCanisterId.trim()) {
+    if (isValidCanisterId(runtimeCanisterId)) {
       return {
-        canisterId: runtimeCanisterId.trim(),
+        canisterId: (runtimeCanisterId as string).trim(),
         source: 'window.__ENV__',
         sourcesAttempted,
       };
@@ -105,7 +118,7 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
         canisterId: null,
         source: 'none',
         sourcesAttempted,
-        error: 'Backend canister ID not found in environment variables (required for local development). Please ensure /env.json contains a non-empty CANISTER_ID_BACKEND value, or set VITE_CANISTER_ID_BACKEND at build time.',
+        error: `Backend canister ID not configured. For production deployments, /env.json must contain a valid, non-placeholder CANISTER_ID_BACKEND value (not "${PLACEHOLDER_CANISTER_ID}"). For local development, set VITE_CANISTER_ID_BACKEND at build time.`,
       };
     }
   }
@@ -118,7 +131,7 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
       canisterId: null,
       source: 'none',
       sourcesAttempted,
-      error: 'Backend canister ID not found in deployment configuration. The frontend canister ID (URL subdomain) cannot be used as the backend canister ID. Please ensure /env.json contains a non-empty CANISTER_ID_BACKEND value. Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }',
+      error: `Backend canister ID not configured in deployment. The frontend canister ID (URL subdomain) cannot be used as the backend canister ID. Production deployments require /env.json to contain a valid, non-placeholder CANISTER_ID_BACKEND value (not "${PLACEHOLDER_CANISTER_ID}"). Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }`,
     };
   }
 
@@ -127,7 +140,7 @@ export function resolveBackendCanisterId(): CanisterIdResolution {
     canisterId: null,
     source: 'none',
     sourcesAttempted,
-    error: 'Backend canister ID not found. Please ensure /env.json contains a non-empty CANISTER_ID_BACKEND value. Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }',
+    error: `Backend canister ID not configured. Production deployments require /env.json to contain a valid, non-placeholder CANISTER_ID_BACKEND value (not "${PLACEHOLDER_CANISTER_ID}"). Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }`,
   };
 }
 
@@ -193,3 +206,4 @@ export async function getBackendCanisterIdOrThrowAsync(): Promise<string> {
   
   return resolution.canisterId;
 }
+

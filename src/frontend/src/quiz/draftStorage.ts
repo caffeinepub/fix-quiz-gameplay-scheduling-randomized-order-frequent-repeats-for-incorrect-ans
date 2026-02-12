@@ -6,6 +6,7 @@ interface QuestionDraft {
   imageUrl?: string | null;
   answers: string[];
   correctAnswer: number;
+  studyArticle?: string;
 }
 
 interface DraftData {
@@ -16,7 +17,7 @@ interface DraftData {
 }
 
 const DRAFT_KEY_PREFIX = 'quiz-draft-';
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 
 function getDraftKey(quizId: QuizId): string {
   return `${DRAFT_KEY_PREFIX}${quizId}`;
@@ -28,6 +29,7 @@ function serializeQuestion(question: Question): QuestionDraft {
     imageUrl: question.imageUrl ? question.imageUrl.getDirectURL() : null,
     answers: question.answers,
     correctAnswer: Number(question.correctAnswer),
+    studyArticle: question.studyArticle,
   };
 }
 
@@ -37,6 +39,7 @@ function deserializeQuestion(draft: QuestionDraft): Question {
     imageUrl: draft.imageUrl ? ExternalBlob.fromURL(draft.imageUrl) : undefined,
     answers: draft.answers,
     correctAnswer: BigInt(draft.correctAnswer),
+    studyArticle: draft.studyArticle,
   };
 }
 

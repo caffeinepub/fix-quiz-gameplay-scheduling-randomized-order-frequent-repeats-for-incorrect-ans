@@ -21,6 +21,7 @@ export interface Question {
   'hint' : [] | [string],
   'text' : string,
   'correctAnswer' : bigint,
+  'studyArticle' : [] | [string],
   'imageUrl' : [] | [ExternalBlob],
 }
 export type QuizId = string;

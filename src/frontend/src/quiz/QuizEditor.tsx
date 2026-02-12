@@ -8,9 +8,10 @@ import type { Question, QuizId } from './types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
-import { Plus, Trash2, Save, Play, AlertCircle, Search, RefreshCw, Eye, Edit2, Check, X, Download } from 'lucide-react';
+import { Plus, Trash2, Save, Play, AlertCircle, Search, RefreshCw, Eye, Edit2, Check, X, Download, BookOpen } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -229,10 +230,14 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
     }
   };
 
-  const performReload = () => {
+  const performReload = async () => {
     clearDraft(quizId);
     setHasUnsavedChanges(false);
-    refetch();
+    const result = await refetch();
+    if (result.data) {
+      setLocalQuestions(result.data);
+      lastSavedQuestionsRef.current = result.data;
+    }
     setShowReloadConfirm(false);
     toast.info('Reloaded questions from server.');
   };
@@ -256,6 +261,7 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
       imageUrl: undefined,
       answers: ['', ''],
       correctAnswer: BigInt(0),
+      studyArticle: undefined,
     };
     setLocalQuestions([...localQuestions, newQuestion]);
     setHasUnsavedChanges(true);
@@ -325,11 +331,20 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
     }
 
     try {
-      await saveQuestionsMutation.mutateAsync(localQuestions);
+      // Normalize studyArticle: treat empty/whitespace-only as undefined
+      const normalizedQuestions = localQuestions.map(q => ({
+        ...q,
+        studyArticle: q.studyArticle && q.studyArticle.trim() ? q.studyArticle.trim() : undefined,
+      }));
+      
+      await saveQuestionsMutation.mutateAsync(normalizedQuestions);
       toast.success('Questions saved successfully!');
       setHasUnsavedChanges(false);
       clearDraft(quizId);
-      lastSavedQuestionsRef.current = localQuestions;
+      lastSavedQuestionsRef.current = normalizedQuestions;
+      
+      // Update local state with normalized data
+      setLocalQuestions(normalizedQuestions);
     } catch (error: any) {
       toast.error(error.message || 'Failed to save questions');
     }
@@ -493,10 +508,17 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">
-                    Block Name: {getCombinedBlockLabel(selectedBlock, blockNamesMap.get(selectedBlock))}
+                    {getCombinedBlockLabel(selectedBlock, blockNamesMap.get(selectedBlock))}
                   </CardTitle>
                   {editingBlockIndex === selectedBlock ? (
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={editingBlockName}
+                        onChange={(e) => setEditingBlockName(e.target.value)}
+                        placeholder="Custom block name"
+                        className="h-8 w-48"
+                        autoFocus
+                      />
                       <Button size="sm" variant="ghost" onClick={handleSaveBlockName}>
                         <Check className="h-4 w-4" />
                       </Button>
@@ -506,132 +528,154 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
                     </div>
                   ) : (
                     <Button size="sm" variant="ghost" onClick={() => handleStartBlockNameEdit(selectedBlock)}>
-                      <Edit2 className="h-4 w-4" />
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Rename Block
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              {editingBlockIndex === selectedBlock && (
-                <CardContent>
-                  <Input
-                    placeholder="Enter block name (e.g., Cardiology)"
-                    value={editingBlockName}
-                    onChange={(e) => setEditingBlockName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveBlockName();
-                      if (e.key === 'Escape') handleCancelBlockNameEdit();
-                    }}
-                    autoFocus
-                  />
-                </CardContent>
-              )}
             </Card>
           )}
 
-          <Accordion type="single" collapsible className="space-y-2">
+          <Accordion type="multiple" className="space-y-4">
             {filteredQuestions.map((question, displayIndex) => {
               const actualIndex = localQuestions.indexOf(question);
+              const questionNumber = actualIndex + 1;
+              const hasStudyArticle = question.studyArticle && question.studyArticle.trim().length > 0;
+
               return (
                 <AccordionItem key={actualIndex} value={`question-${actualIndex}`} className="border rounded-lg px-4">
                   <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3 text-left flex-1">
-                      <Badge variant="outline">#{actualIndex + 1}</Badge>
-                      <span className="truncate">
-                        {question.text || question.imageUrl ? (
-                          question.text || '[Image Question]'
-                        ) : (
-                          <span className="text-muted-foreground italic">Empty question</span>
-                        )}
+                    <div className="flex items-center gap-3 flex-1 text-left">
+                      <Badge variant="outline" className="shrink-0">
+                        Q{questionNumber}
+                      </Badge>
+                      <span className="flex-1 truncate">
+                        {question.text || <span className="text-muted-foreground italic">Empty question</span>}
                       </span>
+                      {hasStudyArticle && (
+                        <BookOpen className="h-4 w-4 text-primary shrink-0" />
+                      )}
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="space-y-4 pt-4">
                     <div className="space-y-2">
-                      <Label>Question Text</Label>
-                      <Input
+                      <Label htmlFor={`question-text-${actualIndex}`}>Question Text</Label>
+                      <Textarea
+                        id={`question-text-${actualIndex}`}
                         value={question.text}
                         onChange={(e) => handleUpdateQuestion(actualIndex, 'text', e.target.value)}
-                        placeholder="Enter question text (optional if image is provided)"
+                        placeholder="Enter question text..."
+                        rows={3}
                       />
                     </div>
 
-                    <QuestionImagePicker
-                      imageUrl={question.imageUrl}
-                      onImageChange={(blob) => handleUpdateQuestion(actualIndex, 'imageUrl', blob)}
-                      questionIndex={actualIndex}
-                    />
-
-                    <div className="space-y-3">
-                      <Label>Answers</Label>
-                      {question.answers.map((answer, answerIndex) => (
-                        <div key={answerIndex} className="flex gap-2 items-start">
-                          <div className="flex-1 space-y-2">
-                            <Input
-                              value={answer}
-                              onChange={(e) => handleUpdateAnswer(actualIndex, answerIndex, e.target.value)}
-                              placeholder={`Answer ${answerIndex + 1}`}
-                            />
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveAnswer(actualIndex, answerIndex)}
-                            disabled={question.answers.length <= 2}
-                            className="shrink-0"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      {question.answers.length < 6 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddAnswer(actualIndex)}
-                          className="w-full"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Answer
-                        </Button>
-                      )}
+                    <div className="space-y-2">
+                      <Label htmlFor={`question-hint-${actualIndex}`}>Hint (Optional)</Label>
+                      <Input
+                        id={`question-hint-${actualIndex}`}
+                        value={question.hint || ''}
+                        onChange={(e) => handleUpdateQuestion(actualIndex, 'hint', e.target.value || undefined)}
+                        placeholder="Enter hint text..."
+                      />
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Correct Answer</Label>
+                      <QuestionImagePicker
+                        questionIndex={actualIndex}
+                        imageUrl={question.imageUrl}
+                        onImageChange={(newImage) => handleUpdateQuestion(actualIndex, 'imageUrl', newImage)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`study-article-${actualIndex}`}>Study Article</Label>
+                      <Textarea
+                        id={`study-article-${actualIndex}`}
+                        value={question.studyArticle || ''}
+                        onChange={(e) => handleUpdateQuestion(actualIndex, 'studyArticle', e.target.value)}
+                        placeholder="Enter educational content or study notes for this question..."
+                        rows={4}
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This text will be shown to users when they review wrong answers.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Answers</Label>
+                        {question.answers.length < 6 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAddAnswer(actualIndex)}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Answer
+                          </Button>
+                        )}
+                      </div>
                       <RadioGroup
                         value={String(question.correctAnswer)}
                         onValueChange={(value) => handleUpdateQuestion(actualIndex, 'correctAnswer', BigInt(value))}
                       >
                         {question.answers.map((answer, answerIndex) => (
-                          <div key={answerIndex} className="flex items-center space-x-2">
+                          <div key={answerIndex} className="flex items-center gap-2">
                             <RadioGroupItem value={String(answerIndex)} id={`q${actualIndex}-a${answerIndex}`} />
-                            <Label htmlFor={`q${actualIndex}-a${answerIndex}`} className="cursor-pointer">
-                              {answer || `Answer ${answerIndex + 1}`}
-                            </Label>
+                            <Input
+                              value={answer}
+                              onChange={(e) => handleUpdateAnswer(actualIndex, answerIndex, e.target.value)}
+                              placeholder={`Answer ${answerIndex + 1}`}
+                              className="flex-1"
+                            />
+                            {question.answers.length > 2 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveAnswer(actualIndex, answerIndex)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         ))}
                       </RadioGroup>
                     </div>
 
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteQuestion(actualIndex)}
-                      className="w-full"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Question
-                    </Button>
+                    <div className="flex justify-end pt-2">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteQuestion(actualIndex)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Question
+                      </Button>
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               );
             })}
           </Accordion>
+
+          {filteredQuestions.length === 0 && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>No Questions Found</AlertTitle>
+              <AlertDescription>
+                No questions match your search criteria. Try adjusting your search or filter.
+              </AlertDescription>
+            </Alert>
+          )}
         </>
       )}
 
       <div className="flex flex-col sm:flex-row gap-3">
-        <Button onClick={handleAddQuestion} className="flex-1">
+        <Button onClick={handleAddQuestion} className="flex-1 sm:flex-initial">
           <Plus className="h-4 w-4 mr-2" />
           Add Question
         </Button>
@@ -639,7 +683,7 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
           onClick={handleSave}
           disabled={!hasUnsavedChanges || saveQuestionsMutation.isPending}
           variant="default"
-          className="flex-1"
+          className="flex-1 sm:flex-initial"
         >
           {saveQuestionsMutation.isPending ? (
             <>
@@ -655,56 +699,68 @@ export default function QuizEditor({ quizId, onStartQuiz }: QuizEditorProps) {
         </Button>
       </div>
 
-      {localQuestions.length > 0 && (
-        <Button onClick={handlePreview} variant="outline" className="w-full">
-          <Eye className="h-4 w-4 mr-2" />
-          Preview First 20 Questions
-        </Button>
-      )}
-
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-3xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle>Preview - First 20 Questions</DialogTitle>
+            <DialogTitle>Preview (First 20 Questions)</DialogTitle>
             <DialogDescription>
-              Review the first 20 questions of your quiz
+              Review how your questions will appear to users
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="h-[60vh] pr-4">
             <div className="space-y-6">
-              {previewQuestions.map((q, index) => (
-                <Card key={index}>
+              {previewQuestions.map((q, idx) => (
+                <Card key={idx}>
                   <CardHeader>
-                    <CardTitle className="text-lg">Question {index + 1}</CardTitle>
+                    <CardTitle className="text-base">
+                      Question {idx + 1}: {q.text}
+                    </CardTitle>
+                    {q.hint && (
+                      <CardDescription className="italic">
+                        Hint: {q.hint}
+                      </CardDescription>
+                    )}
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    {q.text && <p className="font-medium">{q.text}</p>}
+                  <CardContent className="space-y-2">
                     {q.imageUrl && (
-                      <div className="rounded-lg overflow-hidden border">
+                      <div className="mb-4">
                         <img
-                          src={q.imageUrl.getDirectURL()}
-                          alt={`Question ${index + 1}`}
-                          className="w-full h-auto"
+                          src={getExternalBlobUrl(q.imageUrl)}
+                          alt="Question"
+                          className="max-w-full h-auto rounded-lg border"
                         />
                       </div>
                     )}
                     <div className="space-y-2">
-                      {q.answers.map((answer, answerIndex) => (
+                      {q.answers.map((answer, aIdx) => (
                         <div
-                          key={answerIndex}
+                          key={aIdx}
                           className={`p-3 rounded-lg border ${
-                            Number(q.correctAnswer) === answerIndex
-                              ? 'bg-success/10 border-success'
+                            Number(q.correctAnswer) === aIdx
+                              ? 'bg-primary/10 border-primary'
                               : 'bg-muted/50'
                           }`}
                         >
                           {answer}
-                          {Number(q.correctAnswer) === answerIndex && (
-                            <Badge variant="outline" className="ml-2">Correct</Badge>
+                          {Number(q.correctAnswer) === aIdx && (
+                            <Badge variant="default" className="ml-2">
+                              Correct
+                            </Badge>
                           )}
                         </div>
                       ))}
                     </div>
+                    {q.studyArticle && q.studyArticle.trim() && (
+                      <div className="mt-4 p-3 bg-accent/50 rounded-lg border">
+                        <div className="flex items-center gap-2 mb-2">
+                          <BookOpen className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Study Article</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {q.studyArticle}
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

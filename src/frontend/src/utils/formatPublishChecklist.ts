@@ -1,11 +1,13 @@
 import type { BuildInfo } from './buildStamp';
 import { getActorConnectionInfoAsync } from './actorConnectionInfo';
 
+const PLACEHOLDER_CANISTER_ID = 'PLACEHOLDER_BACKEND_CANISTER_ID';
+
 /**
  * Formats a comprehensive plain-text publish checklist in English including current build metadata,
- * resolved backend canister ID with full resolution details or '(not resolved)',
+ * resolved backend canister ID with full resolution details,
  * explicit statement that the app cannot self-publish,
- * runtime env.json guidance requiring non-empty CANISTER_ID_BACKEND,
+ * runtime env.json guidance requiring non-placeholder CANISTER_ID_BACKEND,
  * and detailed step-by-step instructions for publishing to a live canister via the Caffeine editor
  * with post-publish verification steps.
  */
@@ -40,7 +42,9 @@ export async function formatPublishChecklist(buildInfo: BuildInfo): Promise<stri
   
   lines.push('⚠️  IMPORTANT: This app cannot self-publish');
   lines.push('─────────────────────────────────────────────────────────');
-  lines.push('Publishing must be done through the Caffeine editor.');
+  lines.push('Publishing MUST be done through the Caffeine editor.');
+  lines.push('The app provides diagnostics to verify deployment, but');
+  lines.push('the actual publish action happens in the editor.');
   lines.push('');
   
   lines.push('📋 STEP-BY-STEP PUBLISH INSTRUCTIONS');
@@ -51,69 +55,97 @@ export async function formatPublishChecklist(buildInfo: BuildInfo): Promise<stri
   lines.push('   • Ensure all changes are saved and tested in draft mode');
   lines.push('   • Verify the backend canister is running and accessible');
   lines.push('   • Note your backend canister ID (required for step 4)');
+  lines.push('   • Test core functionality before publishing');
   lines.push('');
   
   lines.push('2️⃣  RETURN TO CAFFEINE EDITOR');
   lines.push('   • Navigate back to the Caffeine editor interface');
   lines.push('   • Locate the "Publish to Live" or similar deployment button');
+  lines.push('   • Ensure you are ready to deploy the current version');
   lines.push('');
   
   lines.push('3️⃣  INITIATE PUBLISH VIA EDITOR');
   lines.push('   • Click the publish button in the Caffeine editor');
   lines.push('   • Follow any prompts or confirmations');
   lines.push('   • Wait for the deployment to complete');
-  lines.push('   • Note the live canister ID provided by the editor');
+  lines.push('   • Note the live frontend canister ID provided by the editor');
   lines.push('');
   
   lines.push('4️⃣  CONFIGURE RUNTIME ENVIRONMENT (CRITICAL)');
-  lines.push('   • After publishing, update /env.json in your live deployment');
-  lines.push('   • The file MUST contain a non-empty CANISTER_ID_BACKEND value');
-  lines.push('   • Example /env.json content:');
+  lines.push('   ⚠️  This step is REQUIRED for the app to function on live');
   lines.push('');
-  lines.push('     {');
-  lines.push('       "CANISTER_ID_BACKEND": "your-backend-canister-id-here"');
-  lines.push('     }');
+  lines.push('   • After publishing, /env.json MUST be updated with your backend canister ID');
+  lines.push(`   • The placeholder "${PLACEHOLDER_CANISTER_ID}" will cause connection failures`);
+  lines.push('   • The Caffeine editor should handle this automatically during publish');
   lines.push('');
-  lines.push('   ⚠️  Replace "your-backend-canister-id-here" with your actual');
-  lines.push('      backend canister ID (not the frontend canister ID)');
+  lines.push('   Required /env.json format:');
+  lines.push('   {');
+  lines.push('     "CANISTER_ID_BACKEND": "your-actual-backend-canister-id-here"');
+  lines.push('   }');
   lines.push('');
-  lines.push('   ⚠️  Empty string or placeholder values will cause connection failures');
+  lines.push('   Example with real canister ID:');
+  lines.push('   {');
+  lines.push('     "CANISTER_ID_BACKEND": "rrkah-fqaaa-aaaaa-aaaaq-cai"');
+  lines.push('   }');
+  lines.push('');
+  lines.push('   • This configuration is loaded at runtime by the frontend');
+  lines.push('   • Without a valid canister ID, the app cannot connect to the backend');
+  lines.push('   • If the app fails to connect, verify /env.json was properly configured');
   lines.push('');
   
   lines.push('5️⃣  VERIFY LIVE DEPLOYMENT');
-  lines.push('   • Open the live URL in a new browser tab');
-  lines.push('   • Check that the app loads without configuration errors');
-  lines.push('   • Open browser DevTools → Network tab');
-  lines.push('   • Verify /env.json is accessible and contains correct canister ID');
-  lines.push('   • Test backend connectivity (e.g., run health check)');
-  lines.push('   • Verify authentication works (if applicable)');
-  lines.push('   • Test core functionality to ensure everything works');
-  lines.push('');
-  
-  lines.push('6️⃣  POST-PUBLISH CHECKLIST');
-  lines.push('   ✓ Live URL loads successfully');
-  lines.push('   ✓ /env.json contains non-empty CANISTER_ID_BACKEND');
-  lines.push('   ✓ Backend health check passes');
-  lines.push('   ✓ Authentication works (if enabled)');
-  lines.push('   ✓ Core features are functional');
-  lines.push('   ✓ No console errors related to configuration');
+  lines.push('   • Open the live URL in a new browser tab (incognito mode recommended)');
+  lines.push('   • Check that the app loads without errors');
+  lines.push('   • Log in with Internet Identity');
+  lines.push('   • Click "Deployment Checklist" button to open diagnostics');
+  lines.push('   • Verify in the diagnostics panel:');
+  lines.push('     - Backend Canister ID shows your actual canister (not "(not resolved)")');
+  lines.push('     - Runtime Environment Status shows "correctly configured"');
+  lines.push('     - Backend Health Check shows "Passed"');
+  lines.push('     - Live Readiness shows "Ready"');
+  lines.push('   • Test core functionality (quiz gameplay, admin features, etc.)');
   lines.push('');
   
   lines.push('🔧 TROUBLESHOOTING');
   lines.push('─────────────────────────────────────────────────────────');
   lines.push('If the live deployment fails to connect to the backend:');
   lines.push('');
-  lines.push('• Check /env.json is accessible (browser network tab)');
-  lines.push('• Verify CANISTER_ID_BACKEND is not empty or placeholder');
-  lines.push('• Ensure backend canister ID is correct (not frontend ID)');
-  lines.push('• Confirm backend canister is running (not stopped)');
-  lines.push('• Check browser console for specific error messages');
-  lines.push('• Use Deployment Diagnostics panel for detailed info');
+  lines.push(`• Verify /env.json contains your actual backend canister ID (not "${PLACEHOLDER_CANISTER_ID}")`);
+  lines.push('• Ensure the Caffeine editor publish process completed successfully');
+  lines.push('• Check that the backend canister is deployed and running');
+  lines.push('• Ensure the backend canister ID matches your actual backend');
+  lines.push('• Clear browser cache and hard reload (Ctrl+Shift+R or Cmd+Shift+R)');
+  lines.push('• Check browser console for detailed error messages');
+  lines.push('• Use the "Copy Verification Info" button to share diagnostics');
+  lines.push('• Review the PUBLISHING.md file for detailed troubleshooting steps');
+  lines.push('');
+  
+  lines.push('📊 POST-PUBLISH VERIFICATION');
+  lines.push('─────────────────────────────────────────────────────────');
+  lines.push('After publishing, confirm:');
+  lines.push('');
+  lines.push('✓ Live URL loads without errors');
+  lines.push('✓ Login with Internet Identity works');
+  lines.push('✓ Diagnostics panel shows "Ready" status');
+  lines.push('✓ Backend Health Check passes');
+  lines.push('✓ Backend Canister ID is resolved (not placeholder)');
+  lines.push('✓ Runtime Environment Status shows "correctly configured"');
+  lines.push('✓ Quiz questions load correctly');
+  lines.push('✓ Quiz gameplay functions properly');
+  lines.push('✓ Score tracking works');
+  lines.push('✓ Admin features accessible (if applicable)');
+  lines.push('✓ No console errors in browser developer tools');
   lines.push('');
   
   lines.push('═══════════════════════════════════════════════════════════');
-  lines.push(`Generated: ${new Date().toISOString()}`);
+  lines.push('                    END OF CHECKLIST                       ');
   lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('');
+  lines.push('💡 TIP: Use the "Copy Verification Info" button in the');
+  lines.push('   diagnostics panel to generate a detailed status report');
+  lines.push('   that you can share for troubleshooting.');
+  lines.push('');
+  lines.push('📖 For detailed instructions, see PUBLISHING.md');
   
   return lines.join('\n');
 }

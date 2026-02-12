@@ -1,86 +1,64 @@
 {
   "kind": "build_request",
-  "title": "Replace placeholder Study articles with real generated/stored article content",
+  "title": "Remove study-article access from Wrong Answers Review and resolve deployment configuration failure",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Replace the placeholder implementation of backend article generation so that calling `generateArticle(questionText)` returns a substantive study article (not the current placeholder text) with multiple sections (e.g., short summary, key concepts, reasoning steps, common pitfalls, and a short self-check), suitable for studying the specific question.",
-      "target": "backend",
+      "text": "Remove the educational/study-article functionality from the Wrong Answers Review flow so users cannot open or view a Study Article from the wrong-question review experience.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "recent-messages"
+          "msg-4",
+          "msg-8"
         ],
         "quotes": [
-          "last modification is not ready, I can see nice icon \"study\" on right side of wrong answered question but there is no AI generated study content, only this messag:This is a generated long-form educational article... Please add the articles"
+          "Remove educational article function from wrong guestion review as I asking before, it is still there",
+          "yes, fix it and run again"
         ]
       },
       "acceptanceCriteria": [
-        "For the example question text shown by the user, the returned `Article.content` does not contain the placeholder sentence starting with \"This is a generated long-form educational article...\"",
-        "`generateArticle(questionText)` returns non-empty `Article.title` and `Article.content` that includes at least 3 clearly separated sections (headings or labeled paragraphs)",
-        "The backend keeps enforcing the existing authorization rule: only callers with `#user` permission can generate/read articles"
+        "The Wrong Answers Review screen (frontend/src/quiz/WrongAnswersReview.tsx) contains no UI affordance to open a study article (no click-to-open behavior, buttons, links, or navigation).",
+        "The app no longer navigates to the Study Article view from any wrong-answers review action; the 'studyArticle' view is not reachable through the wrong-answer review flow.",
+        "Wrong answer review entries no longer carry or rely on a 'studyArticle' field in the frontend data flow (update frontend/src/quiz/wrongAnswerTypes.ts and the place where wrong-answers are assembled in frontend/src/quiz/QuizGameplay.tsx accordingly).",
+        "Any now-unused state, handlers, imports, and view routing related to opening StudyArticleView from wrong-answer review are removed from frontend/src/App.tsx (e.g., selectedStudyQuestion, handleStudyQuestion, and the 'studyArticle' view branch), without breaking other views."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Add backend persistence for generated/stored articles so that once an article is created for a question, subsequent requests for the same question return the same saved article instead of re-generating placeholder content on each call.",
-      "target": "backend",
+      "text": "Fix the configuration issue preventing builds/deployments from running successfully, and ensure the app can be rebuilt and redeployed after the fix.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "recent-messages"
+          "msg-6",
+          "msg-7",
+          "msg-8"
         ],
         "quotes": [
-          "Please add the articles"
+          "⚠️ Configuration error found. Please contact the Caffeine team for assistance.",
+          "It looks like the last build hit a configuration issue — want me to try running it again now?",
+          "yes, fix it and run again"
         ]
       },
       "acceptanceCriteria": [
-        "After generating an article for a given `questionText`, a subsequent call to `generateArticle(questionText)` returns the previously stored article",
-        "Articles remain available after a canister upgrade (implement stable persistence via preupgrade/postupgrade or a conditional migration, as appropriate for this project)"
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "text": "Update the frontend Study article flow (Wrong Answers Review → Study Article View) so it reliably displays the substantive article returned by the backend and never shows placeholder-only content to the user.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "recent-messages"
-        ],
-        "quotes": [
-          "there is no AI generated study content, only this messag:This is a generated long-form educational article..."
-        ]
-      },
-      "acceptanceCriteria": [
-        "Clicking the Study button for a wrong-answered question shows the full article content returned by the backend",
-        "The Study article view shows a clear error state if article generation fails (no silent fallback to placeholder text)",
-        "The Study article view continues to show the question reference and article title/content in a readable, scrollable layout as it does today"
+        "The project builds successfully without triggering a configuration error.",
+        "The deployed preview can initialize the backend actor (i.e., does not fail immediately due to missing/invalid runtime configuration).",
+        "If the runtime configuration (/frontend/public/env.json) contains the placeholder canister id value (\"PLACEHOLDER_BACKEND_CANISTER_ID\"), the UI clearly surfaces this as a configuration problem (via existing diagnostics/connection error UI) and provides actionable steps, rather than failing silently."
       ]
     }
   ],
   "constraints": [
-    "Do not integrate external LLM/AI services (no OpenAI/Anthropic/etc.); article content must be generated/stored within the Internet Computer canister and/or shipped as static/backend-managed content.",
-    "Respect the existing single-actor Motoko backend architecture (all logic in `backend/main.mo`; add `backend/migration.mo` only if required by state upgrade needs).",
-    "Do not edit files under `frontend/src/components/ui` or any other immutable frontend paths listed in SYSTEM_CONTEXT."
+    "Do not edit files under frontend/src/components/ui (read-only Shadcn components).",
+    "Do not edit frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, or frontend/src/main.tsx (immutable paths).",
+    "Keep all backend logic in the single Motoko actor (backend/main.mo); only add backend/migration.mo if a stable-state schema change is required."
   ],
   "nonGoals": [
-    "Adding third-party authentication providers beyond Internet Identity.",
-    "Adding real-time features (WebSockets/chat).",
-    "Building an external content pipeline or CMS integration for article authoring."
+    "Do not remove the general quiz gameplay, scoring, or translation features.",
+    "Do not add new authentication providers beyond Internet Identity.",
+    "Do not introduce external databases or non-Motoko backend services."
   ],
   "imageRequirements": {
     "required": [],
     "edits": []
-  },
-  "userProfileUpdate": {
-    "goalsToAdd": [],
-    "goalsToRemove": [],
-    "preferencesToAdd": [
-      "Use English for any user-facing text added/changed as part of this build request."
-    ],
-    "preferencesToRemove": [],
-    "miscToAdd": [],
-    "miscToRemove": [],
-    "fieldsToSet": {},
-    "fieldsToDelete": []
   }
 }

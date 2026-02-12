@@ -28,6 +28,7 @@ export interface Question {
     hint?: string;
     text: string;
     correctAnswer: bigint;
+    studyArticle?: string;
     imageUrl?: ExternalBlob;
 }
 export interface UserProfile {
@@ -70,5 +71,5 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     saveQuestions(quizId: QuizId, questionsInput: Array<Question>): Promise<void>;
     setBlockName(quizId: QuizId, blockIndex: bigint, blockName: string): Promise<void>;
-    writeArticle(_articleId: string): Promise<void>;
+    writeArticle(_questionId: string): Promise<void>;
 }

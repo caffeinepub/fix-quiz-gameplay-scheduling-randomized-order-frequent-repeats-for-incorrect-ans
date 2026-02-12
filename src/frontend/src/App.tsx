@@ -8,11 +8,11 @@ import QuizEditor from './quiz/QuizEditor';
 import QuizGameplay from './quiz/QuizGameplay';
 import QuizResults from './quiz/QuizResults';
 import WrongAnswersReview from './quiz/WrongAnswersReview';
-import StudyArticleView from './quiz/StudyArticleView';
 import DeploymentDiagnosticsPanel from './components/DeploymentDiagnosticsPanel';
 import BuildIdentityFooter from './components/BuildIdentityFooter';
 import AppHeaderBrand from './components/AppHeaderBrand';
-import { Edit, Play, Bug, AlertTriangle, RefreshCw, Power } from 'lucide-react';
+import PendingUpdateBanner from './components/PendingUpdateBanner';
+import { Edit, Play, Bug, AlertTriangle, RefreshCw, Power, ClipboardCheck } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
@@ -24,7 +24,7 @@ import { refreshToLatestBuild } from './utils/refreshToLatestBuild';
 import { detectStoppedCanister, formatStoppedCanisterMessage, getStoppedCanisterRecoverySteps } from './utils/stoppedCanisterDetection';
 import type { WrongAnswerEntry } from './quiz/wrongAnswerTypes';
 
-type View = 'editor' | 'gameplay' | 'results' | 'wrongAnswersReview' | 'studyArticle';
+type View = 'editor' | 'gameplay' | 'results' | 'wrongAnswersReview';
 
 const ACTIVE_QUIZ_ID = 'TN intelligence Quiz';
 
@@ -44,7 +44,6 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>('gameplay');
   const [sessionScore, setSessionScore] = useState({ correct: 0, total: 0 });
   const [wrongAnswers, setWrongAnswers] = useState<WrongAnswerEntry[]>([]);
-  const [selectedStudyQuestion, setSelectedStudyQuestion] = useState<WrongAnswerEntry | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [focusPublishSection, setFocusPublishSection] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -96,15 +95,6 @@ export default function App() {
     setCurrentView('results');
   };
 
-  const handleStudyQuestion = (entry: WrongAnswerEntry) => {
-    setSelectedStudyQuestion(entry);
-    setCurrentView('studyArticle');
-  };
-
-  const handleBackToWrongAnswers = () => {
-    setCurrentView('wrongAnswersReview');
-  };
-
   const handlePlayAgain = () => {
     setCurrentView('gameplay');
   };
@@ -130,6 +120,16 @@ export default function App() {
 
   const handleProfileSetupComplete = () => {
     queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+  };
+
+  const handleOpenPublishPanel = () => {
+    setShowDiagnostics(true);
+    setFocusPublishSection(true);
+  };
+
+  const handleCloseDiagnostics = () => {
+    setShowDiagnostics(false);
+    setFocusPublishSection(false);
   };
 
   const showProfileSetup = isAuthenticated && !profileLoading && isFetched && userProfile === null;
@@ -282,7 +282,7 @@ export default function App() {
 
             {showDiagnostics && (
               <DeploymentDiagnosticsPanel
-                onClose={() => setShowDiagnostics(false)}
+                onClose={handleCloseDiagnostics}
                 focusPublishSection={focusPublishSection}
               />
             )}
@@ -334,6 +334,16 @@ export default function App() {
                     </Button>
                   </div>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenPublishPanel}
+                  className="hidden sm:flex"
+                  title="View deployment diagnostics and publishing checklist (publishing happens via Caffeine editor)"
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Deployment Checklist
+                </Button>
                 <LoginButton />
               </div>
             </div>
@@ -341,7 +351,29 @@ export default function App() {
         </header>
       )}
 
+      {/* Always-available diagnostics button when header is hidden during active quiz */}
+      {isInActiveQuiz && (
+        <div className="fixed top-4 right-4 z-50">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenPublishPanel}
+            className="shadow-lg bg-card/95 backdrop-blur-sm"
+            title="View deployment diagnostics and publishing checklist"
+          >
+            <ClipboardCheck className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Checklist</span>
+          </Button>
+        </div>
+      )}
+
       <main className="flex-1">
+        {!isInActiveQuiz && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <PendingUpdateBanner />
+          </div>
+        )}
+        
         {currentView === 'editor' && isAdmin && (
           <QuizEditor quizId={ACTIVE_QUIZ_ID} onStartQuiz={handleStartQuiz} />
         )}
@@ -359,25 +391,29 @@ export default function App() {
             wrongAnswers={wrongAnswers}
             onPlayAgain={handlePlayAgain}
             onReviewWrongAnswers={handleReviewWrongAnswers}
+            onBackToEditor={isAdmin ? () => setCurrentView('editor') : undefined}
           />
         )}
         {currentView === 'wrongAnswersReview' && (
           <WrongAnswersReview
             wrongAnswers={wrongAnswers}
             onBack={handleBackToResults}
-            onStudy={handleStudyQuestion}
-          />
-        )}
-        {currentView === 'studyArticle' && selectedStudyQuestion && (
-          <StudyArticleView
-            questionText={selectedStudyQuestion.questionText}
-            questionNumber={selectedStudyQuestion.questionNumber}
-            onBack={handleBackToWrongAnswers}
           />
         )}
       </main>
 
-      {!isInActiveQuiz && <BuildIdentityFooter />}
+      {showDiagnostics && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 overflow-y-auto">
+          <div className="min-h-screen p-4">
+            <DeploymentDiagnosticsPanel
+              onClose={handleCloseDiagnostics}
+              focusPublishSection={focusPublishSection}
+            />
+          </div>
+        </div>
+      )}
+
+      <BuildIdentityFooter />
       <Toaster />
     </div>
   );

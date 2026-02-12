@@ -1,0 +1,72 @@
+
+# Next Steps
+- Build a prompt including these instructions and output requirements.
+- Systematically search for best practices and templates for writing study articles.
+- Refine this prompt for integration with GPT-4 and Claude-3 for automated content generation.
+- Ensure content is always pretty-printed and self-contained.
+- Merge best practices into the prompt as soon as empirical rules develop.
+";
+
+    // In the future, use `instructions` to guide LLM output. For now, use static content.
+
+    switch (persistentArticles.get(questionText)) {
+      case (?existingArticle) { existingArticle };
+      case (null) {
+        let content = "
+# Short Summary
+This section provides a high-level overview of the concepts involved in the question.
+
+# Key Concepts
+- Definition 1
+- Concept 2
+- Theorem 3
+
+# Reasoning Steps
+1. Identify the main topic.
+2. Recall relevant formulas or techniques.
+3. Apply logical reasoning to solve the problem.
+
+# Common Pitfalls
+- Misinterpreting the question
+- Forgetting key assumptions
+- Rushing through calculations
+
+# Self-Check
+Try to solve the following similar problem:
+[Insert self-check question here]
+
+# Final Thoughts
+Review the solution and ensure you understand each step. Practice similar problems to reinforce your understanding.
+";
+
+        let newArticle = {
+          title = "Generated Study Article: " # questionText;
+          content;
+        };
+
+        // Persist generated article
+        persistentArticles.add(questionText, newArticle);
+
+        newArticle;
+      };
+    };
+  };
+
+  public shared ({ caller }) func writeArticle(_articleId : Text) : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can write articles");
+    };
+  };
+
+  public shared ({ caller }) func pushAllArticlesToBackend() : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can push articles to backend");
+    };
+  };
+
+  public shared ({ caller }) func pushArticlesToContentTeam() : async () {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only admins can push articles to content team");
+    };
+  };
+};

@@ -1,22 +1,19 @@
 import Map "mo:core/Map";
 import Text "mo:core/Text";
+import Principal "mo:core/Principal";
 import Nat "mo:core/Nat";
 import Array "mo:core/Array";
 import Iter "mo:core/Iter";
 import Time "mo:core/Time";
 import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
-import Migration "migration";
-
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
-
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
-// Apply migration on upgrade
-(with migration = Migration.run)
 actor {
+  let backendVersion : Nat = 3;
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
@@ -55,6 +52,7 @@ actor {
     imageUrl : ?Storage.ExternalBlob;
     answers : [Text];
     correctAnswer : Nat;
+    studyArticle : ?Text; // This field must stay optional!
   };
 
   public type Article = {
@@ -99,10 +97,16 @@ actor {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access quiz data");
     };
-    switch (quizSets.get(quizId)) {
+    let allQuestionSets = switch (quizSets.get(quizId)) {
       case (null) { [] };
       case (?questions) { questions };
     };
+    let questionsWithArticles = allQuestionSets.map(
+      func(q) {
+        { q with studyArticle = q.studyArticle };
+      }
+    );
+    questionsWithArticles;
   };
 
   public query ({ caller }) func getQuestions(quizId : QuizId, chunkSize : Nat, chunkIndex : Nat) : async [Question] {
@@ -115,7 +119,13 @@ actor {
         let startIndex = chunkIndex * chunkSize;
         if (startIndex > questions.size()) { return [] };
         let filteredQuestions = questions.values().drop(startIndex);
-        filteredQuestions.take(chunkSize).toArray();
+        let chunk = filteredQuestions.take(chunkSize).toArray();
+        let chunkWithArticles = chunk.map(
+          func(q) {
+            { q with studyArticle = q.studyArticle };
+          }
+        );
+        chunkWithArticles;
       };
     };
   };
@@ -157,7 +167,12 @@ actor {
       case (null) { [] : [Question] };
       case (?existing) { existing };
     };
-    let combinedQuestions = existingQuestions.concat(newQuestions);
+    let existingWithArticles = existingQuestions.map(
+      func(q) {
+        { q with studyArticle = q.studyArticle };
+      }
+    );
+    let combinedQuestions = existingWithArticles.concat(newQuestions);
     quizSets.add(quizId, combinedQuestions);
   };
 
@@ -259,7 +274,7 @@ actor {
     };
 
     {
-      version = 2;
+      version = 3;
       questions = convertQuestionsToImmutable(quizSets.toArray());
       blockNames = convertBlockNamesToImmutable(blockNames.toArray());
     };
@@ -269,7 +284,7 @@ actor {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can restore state");
     };
-    if (exportedState.version != 1 and exportedState.version != 2) {
+    if (exportedState.version > 3) {
       Runtime.trap("Unsupported export format");
     };
     quizSets.clear();
@@ -290,12 +305,12 @@ actor {
   public query ({ caller }) func healthCheck() : async HealthCheckResult {
     {
       systemTime = Time.now();
-      backendVersion = 2;
+      backendVersion;
     };
   };
 
   // Persistent Article Queries (No Outcalls/AI for now)
-  public shared ({ caller }) func getArticle(articleId : Text) : async Article {
+  public query ({ caller }) func getArticle(articleId : Text) : async Article {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access articles");
     };
@@ -315,43 +330,46 @@ actor {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can generate articles");
     };
-    // Attempt to get existing persistent article
+
     switch (persistentArticles.get(questionText)) {
       case (?existingArticle) { existingArticle };
       case (null) {
-        let content = "
-          # Short Summary
-          This section provides a high-level overview of the concepts involved in the question.
+        let generatedContent : Text = "
+# Understanding the Question
 
-          # Key Concepts
-          - Definition 1
-          - Concept 2
-          - Theorem 3
+It's important to analyze the specific requirements of the problem described as: " # questionText # ". Ensure you fully comprehend what is being asked before attempting a solution.
 
-          # Reasoning Steps
-          1. Identify the main topic.
-          2. Recall relevant formulas or techniques.
-          3. Apply logical reasoning to solve the problem.
+# Key Concepts
 
-          # Common Pitfalls
-          - Misinterpreting the question
-          - Forgetting key assumptions
-          - Rushing through calculations
+- Clearly define all terms used in the question.
+- Identify the underlying principles involved.
+- Review any relevant formulas or techniques.
 
-          # Self-Check
-          Try to solve the following similar problem:
-          [Insert self-check question here]
+# Step-by-Step Approach
 
-          # Final Thoughts
-          Review the solution and ensure you understand each step. Practice similar problems to reinforce your understanding.
-        ";
+1. Clarify what you need to find or prove.
+2. List out all known information and assumptions.
+3. Break down the problem into smaller, manageable parts.
+4. Apply logical reasoning or calculations as needed.
+
+# Common Challenges
+
+Be cautious of potential misunderstandings or common mistakes. Take your time to thoroughly analyze each step before proceeding.
+
+# Practice Question
+
+Try to create a similar question and solve it using the steps outlined above. This will reinforce your understanding and help you retain the concepts learned.
+
+# Recap
+
+To summarize, always start by fully understanding the question, identify key concepts, and approach the problem step by step. Continuous practice will help you master these concepts.
+";
 
         let newArticle = {
           title = "Generated Study Article: " # questionText;
-          content;
+          content = generatedContent;
         };
 
-        // Persist generated article
         persistentArticles.add(questionText, newArticle);
 
         newArticle;
@@ -359,7 +377,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func writeArticle(_articleId : Text) : async () {
+  public shared ({ caller }) func writeArticle(_questionId : Text) : async () {
     if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
       Runtime.trap("Unauthorized: Only admins can write articles");
     };

@@ -26,6 +26,7 @@ export const Question = IDL.Record({
   'hint' : IDL.Opt(IDL.Text),
   'text' : IDL.Text,
   'correctAnswer' : IDL.Nat,
+  'studyArticle' : IDL.Opt(IDL.Text),
   'imageUrl' : IDL.Opt(ExternalBlob),
 });
 export const UserRole = IDL.Variant({
@@ -85,7 +86,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getAllQuestions' : IDL.Func([QuizId], [IDL.Vec(Question)], ['query']),
-  'getArticle' : IDL.Func([IDL.Text], [Article], []),
+  'getArticle' : IDL.Func([IDL.Text], [Article], ['query']),
   'getBlockName' : IDL.Func([QuizId, IDL.Nat], [IDL.Opt(IDL.Text)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
@@ -137,6 +138,7 @@ export const idlFactory = ({ IDL }) => {
     'hint' : IDL.Opt(IDL.Text),
     'text' : IDL.Text,
     'correctAnswer' : IDL.Nat,
+    'studyArticle' : IDL.Opt(IDL.Text),
     'imageUrl' : IDL.Opt(ExternalBlob),
   });
   const UserRole = IDL.Variant({
@@ -196,7 +198,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getAllQuestions' : IDL.Func([QuizId], [IDL.Vec(Question)], ['query']),
-    'getArticle' : IDL.Func([IDL.Text], [Article], []),
+    'getArticle' : IDL.Func([IDL.Text], [Article], ['query']),
     'getBlockName' : IDL.Func(
         [QuizId, IDL.Nat],
         [IDL.Opt(IDL.Text)],

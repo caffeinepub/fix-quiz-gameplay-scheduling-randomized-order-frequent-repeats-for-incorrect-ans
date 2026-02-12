@@ -1,20 +1,18 @@
 import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, BookOpen } from 'lucide-react';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { useGenerateArticle } from '../hooks/useGenerateArticle';
 
 interface StudyArticleViewProps {
   questionText: string;
   questionNumber: number;
+  studyArticle?: string;
   onBack: () => void;
 }
 
-export default function StudyArticleView({ questionText, questionNumber, onBack }: StudyArticleViewProps) {
-  const { data: article, isLoading, error } = useGenerateArticle(questionText);
-
+export default function StudyArticleView({ questionText, questionNumber, studyArticle, onBack }: StudyArticleViewProps) {
   // Handle Escape key press
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -28,6 +26,8 @@ export default function StudyArticleView({ questionText, questionNumber, onBack 
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [onBack]);
+
+  const hasArticle = studyArticle && studyArticle.trim().length > 0;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -52,29 +52,18 @@ export default function StudyArticleView({ questionText, questionNumber, onBack 
           </p>
         </CardHeader>
         <CardContent>
-          {isLoading && (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground">Generating educational article...</p>
-            </div>
-          )}
-
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-5 w-5" />
-              <AlertTitle className="font-semibold">Article Generation Failed</AlertTitle>
+          {!hasArticle && (
+            <Alert className="mb-6">
+              <BookOpen className="h-5 w-5" />
+              <AlertTitle className="font-semibold">No Study Article Available</AlertTitle>
               <AlertDescription className="mt-2">
-                <p className="mb-2">
-                  The educational article could not be generated at this time. This feature requires real content to be available.
-                </p>
-                <p className="text-sm opacity-90">
-                  Error: {error instanceof Error ? error.message : 'Unknown error occurred'}
+                <p className="mb-4">
+                  No study article is available for this question. The administrator has not yet added educational content for this topic.
                 </p>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={onBack}
-                  className="mt-4"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Wrong Answers
@@ -83,7 +72,7 @@ export default function StudyArticleView({ questionText, questionNumber, onBack 
             </Alert>
           )}
 
-          {article && !isLoading && !error && (
+          {hasArticle && (
             <ScrollArea className="h-[60vh]">
               <div className="space-y-6 pr-4">
                 {/* Question reference */}
@@ -92,15 +81,10 @@ export default function StudyArticleView({ questionText, questionNumber, onBack 
                   <p className="text-base leading-relaxed">{questionText}</p>
                 </div>
 
-                {/* Article title */}
-                <div>
-                  <h2 className="text-2xl font-bold mb-4">{article.title}</h2>
-                </div>
-
                 {/* Article content */}
                 <div className="prose prose-sm sm:prose-base max-w-none dark:prose-invert">
                   <div className="whitespace-pre-wrap leading-relaxed text-foreground">
-                    {article.content}
+                    {studyArticle}
                   </div>
                 </div>
               </div>

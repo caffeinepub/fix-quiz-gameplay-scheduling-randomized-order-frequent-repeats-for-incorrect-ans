@@ -5,4 +5,5 @@
 export interface WrongAnswerEntry {
   questionNumber: number;
   questionText: string;
+  questionGlobalIndex: number;
 }

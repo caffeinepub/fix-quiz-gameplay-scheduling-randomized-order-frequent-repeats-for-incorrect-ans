@@ -6,7 +6,7 @@ import { inspectRuntimeEnv } from './runtimeEnvStatus';
 /**
  * Formatter that generates comprehensive plain-text "Live Verification Info" report in English
  * including live URL, complete build metadata, backend canister resolution details,
- * runtime env.json status, network/host configuration,
+ * runtime env.json status with presence check, network/host configuration,
  * and clear health-check status/result section with async connection info loading.
  */
 export async function shareLiveVerificationInfo(
@@ -23,12 +23,17 @@ export async function shareLiveVerificationInfo(
   lines.push('              LIVE VERIFICATION REPORT                     ');
   lines.push('═══════════════════════════════════════════════════════════');
   lines.push('');
+  lines.push(`Generated: ${new Date().toISOString()}`);
+  lines.push('');
   
   lines.push('🌐 DEPLOYMENT URL');
   lines.push('─────────────────────────────────────────────────────────');
   lines.push(`Live URL:  ${window.location.origin}${window.location.pathname}`);
   if (window.location.hash) {
     lines.push(`Hash:      ${window.location.hash}`);
+  }
+  if (window.location.search) {
+    lines.push(`Query:     ${window.location.search}`);
   }
   lines.push('');
   
@@ -67,32 +72,67 @@ export async function shareLiveVerificationInfo(
   
   lines.push('🌍 NETWORK CONFIGURATION');
   lines.push('─────────────────────────────────────────────────────────');
-  lines.push(`Host:      ${connectionInfo.host}`);
-  lines.push(`Network:   ${connectionInfo.network}`);
+  lines.push(`Network:  ${connectionInfo.network}`);
+  lines.push(`Host:     ${connectionInfo.host}`);
   lines.push('');
   
   lines.push('🏥 BACKEND HEALTH CHECK');
   lines.push('─────────────────────────────────────────────────────────');
   if (healthCheckResult) {
-    lines.push('Status: ✅ SUCCESS');
+    lines.push('Status: ✅ PASSED');
     lines.push('');
-    lines.push(`Backend Version: ${healthCheckResult.backendVersion}`);
-    lines.push(`System Time:     ${healthCheckResult.systemTime}`);
-    lines.push(`Timestamp:       ${new Date(Number(healthCheckResult.systemTime) / 1_000_000).toISOString()}`);
+    lines.push(`Backend Version:  ${healthCheckResult.backendVersion.toString()}`);
+    lines.push(`System Time:      ${new Date(Number(healthCheckResult.systemTime) / 1000000).toISOString()}`);
+    lines.push(`Local Time:       ${new Date(Number(healthCheckResult.systemTime) / 1000000).toLocaleString()}`);
   } else if (healthCheckError) {
     lines.push('Status: ❌ FAILED');
     lines.push('');
-    lines.push(`Error: ${healthCheckError}`);
+    lines.push('Error Details:');
+    lines.push(healthCheckError);
   } else {
-    lines.push('Status: ⏳ NOT RUN');
+    lines.push('Status: ⏸️  NOT RUN');
     lines.push('');
-    lines.push('Health check has not been executed yet.');
+    lines.push('Run the health check from the diagnostics panel to test backend connectivity.');
+  }
+  lines.push('');
+  
+  lines.push('📊 OVERALL READINESS');
+  lines.push('─────────────────────────────────────────────────────────');
+  const isReady = 
+    runtimeEnvStatus.canisterIdPresent && 
+    connectionInfo.canisterId && 
+    !connectionInfo.canisterIdResolutionError &&
+    healthCheckResult !== null;
+  
+  if (isReady) {
+    lines.push('Status: ✅ READY');
+    lines.push('');
+    lines.push('The app is properly configured and connected to the backend.');
+    lines.push('All systems are operational.');
+  } else {
+    lines.push('Status: ⚠️  NOT READY');
+    lines.push('');
+    lines.push('Issues detected:');
+    if (!runtimeEnvStatus.canisterIdPresent) {
+      lines.push('  • Runtime environment not properly configured (check /env.json)');
+    }
+    if (!connectionInfo.canisterId || connectionInfo.canisterIdResolutionError) {
+      lines.push('  • Backend canister ID not resolved');
+    }
+    if (!healthCheckResult) {
+      lines.push('  • Backend health check not passed');
+    }
+    lines.push('');
+    lines.push('Review the sections above for detailed troubleshooting steps.');
   }
   lines.push('');
   
   lines.push('═══════════════════════════════════════════════════════════');
-  lines.push(`Generated: ${new Date().toISOString()}`);
+  lines.push('                    END OF REPORT                          ');
   lines.push('═══════════════════════════════════════════════════════════');
+  lines.push('');
+  lines.push('💡 Share this report when requesting support or troubleshooting');
+  lines.push('   deployment issues. It contains all relevant diagnostic information.');
   
   return lines.join('\n');
 }

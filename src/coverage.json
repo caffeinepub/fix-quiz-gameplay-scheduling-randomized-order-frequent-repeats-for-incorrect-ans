@@ -1,55 +1,60 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-11T17:31:16.916Z",
+  "generatedAt": "2026-02-12T09:31:15.161Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 1,
+    "total": 2,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Replace the placeholder implementation of backend article generation so that calling `generateArticle(questionText)` returns a substantive study article (not the current placeholder text) with multiple sections (e.g., short summary, key concepts, reasoning steps, common pitfalls, and a short self-check), suitable for studying the specific question.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Remove the educational/study-article functionality from the Wrong Answers Review flow so users cannot open or view a Study Article from the wrong-question review experience.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/quiz/wrongAnswerTypes.ts",
+          "frontend/src/quiz/QuizGameplay.tsx",
+          "frontend/src/App.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/quiz/wrongAnswerTypes.ts",
+          "frontend/src/quiz/QuizGameplay.tsx",
+          "frontend/src/App.tsx"
+        ]
       },
       {
         "id": "REQ-2",
-        "summary": "Add backend persistence for generated/stored articles so that once an article is created for a question, subsequent requests for the same question return the same saved article instead of re-generating placeholder content on each call.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-3",
-        "summary": "Update the frontend Study article flow (Wrong Answers Review → Study Article View) so it reliably displays the substantive article returned by the backend and never shows placeholder-only content to the user.",
+        "summary": "Fix the configuration issue preventing builds/deployments from running successfully, and ensure the app can be rebuilt and redeployed after the fix.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/hooks/useGenerateArticle.ts",
-          "frontend/src/quiz/StudyArticleView.tsx"
+          "frontend/src/declarations/backend/index.ts",
+          "frontend/src/config/index.ts",
+          "frontend/src/utils/canisterIdResolution.ts",
+          "frontend/src/App.tsx",
+          "frontend/public/env.json"
         ],
         "matchedFiles": [
-          "frontend/src/hooks/useGenerateArticle.ts",
-          "frontend/src/quiz/StudyArticleView.tsx"
+          "frontend/src/declarations/backend/index.ts",
+          "frontend/src/config/index.ts",
+          "frontend/src/App.tsx"
         ]
       }
     ]
   },
   "changedFiles": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/hooks/useGenerateArticle.ts",
-    "frontend/src/quiz/StudyArticleView.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/config/index.ts",
+    "frontend/src/declarations/backend/index.ts",
+    "frontend/src/quiz/QuizGameplay.tsx",
+    "frontend/src/quiz/WrongAnswersReview.tsx",
+    "frontend/src/quiz/wrongAnswerTypes.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",
