@@ -1,15 +1,15 @@
 import Map "mo:core/Map";
 import Text "mo:core/Text";
-import Principal "mo:core/Principal";
-import Nat "mo:core/Nat";
 import Array "mo:core/Array";
 import Iter "mo:core/Iter";
 import Time "mo:core/Time";
-import Runtime "mo:core/Runtime";
+import Nat "mo:core/Nat";
+import Principal "mo:core/Principal";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
+import Runtime "mo:core/Runtime";
 
 actor {
   let backendVersion : Nat = 3;
@@ -52,7 +52,7 @@ actor {
     imageUrl : ?Storage.ExternalBlob;
     answers : [Text];
     correctAnswer : Nat;
-    studyArticle : ?Text; // This field must stay optional!
+    studyArticle : ?Text;
   };
 
   public type Article = {
@@ -66,7 +66,6 @@ actor {
   let quizSets = Map.empty<Text, [Question]>();
   let blockNames = Map.empty<Text, Map.Map<Nat, Text>>();
 
-  // Persistent Article Store
   let persistentArticles = Map.empty<Text, Article>();
 
   public query ({ caller }) func isValidQuizId(quizId : QuizId) : async Bool {
@@ -309,7 +308,6 @@ actor {
     };
   };
 
-  // Persistent Article Queries (No Outcalls/AI for now)
   public query ({ caller }) func getArticle(articleId : Text) : async Article {
     if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Runtime.trap("Unauthorized: Only users can access articles");

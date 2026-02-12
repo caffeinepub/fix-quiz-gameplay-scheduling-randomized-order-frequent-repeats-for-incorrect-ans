@@ -21,7 +21,8 @@ function getAgentHost(): string {
 }
 
 /**
- * Gets actor connection info asynchronously, including declarations fallback.
+ * Gets actor connection info asynchronously, including manual overrides and declarations fallback.
+ * Source label explicitly shows window.__ENV__.CANISTER_ID_BACKEND for runtime config.
  */
 export async function getActorConnectionInfoAsync(): Promise<ConnectionInfo> {
   const host = getAgentHost();
@@ -46,8 +47,9 @@ export async function getActorConnectionInfoAsync(): Promise<ConnectionInfo> {
 }
 
 /**
- * Synchronous version for immediate use (doesn't include declarations fallback).
+ * Synchronous version for immediate use (includes manual overrides, doesn't include declarations fallback).
  * Use getActorConnectionInfoAsync() when you can afford the async operation.
+ * Source label explicitly shows window.__ENV__.CANISTER_ID_BACKEND for runtime config.
  */
 export function getActorConnectionInfo(): ConnectionInfo {
   const host = getAgentHost();

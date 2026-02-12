@@ -1,68 +1,63 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Disable Study Articles in Wrong Answers Review and harden runtime configuration for successful builds/deploys",
+  "title": "Production publish verification and deployment diagnostics hardening",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Remove Study Article access and data flow from the Wrong Answers Review experience.",
+      "summary": "Ensure the production publish flow (via Caffeine editor) injects a real backend canister ID into live /env.json and is verifiable without manual env.json edits.",
       "acceptanceCriteria": [
-        "The Wrong Answers Review screen (frontend/src/quiz/WrongAnswersReview.tsx) contains no UI affordance to open a study article (no click-to-open behavior, buttons, links, or navigation).",
-        "The app no longer navigates to the Study Article view from any wrong-answers review action; the 'studyArticle' view is not reachable through the wrong-answer review flow.",
-        "Wrong answer review entries no longer carry or rely on a 'studyArticle' field in the frontend data flow (update frontend/src/quiz/wrongAnswerTypes.ts and the place where wrong-answers are assembled in frontend/src/quiz/QuizGameplay.tsx accordingly).",
-        "Any now-unused state, handlers, imports, and view routing related to opening StudyArticleView from wrong-answer review are removed from frontend/src/App.tsx (e.g., selectedStudyQuestion, handleStudyQuestion, and the 'studyArticle' view branch), without breaking other views."
+        "A live (production) deployment is created from the current draft build via the Caffeine editor publish action.",
+        "In the live deployment, fetching `/env.json` returns a JSON object with `CANISTER_ID_BACKEND` set to a non-empty, non-placeholder value (not `PLACEHOLDER_BACKEND_CANISTER_ID`).",
+        "No manual edits are made to `frontend/public/env.json` as part of the publish process."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/quiz/wrongAnswerTypes.ts",
+          "path": "frontend/PUBLISHING.md",
           "operation": "modify",
-          "description": "Remove the optional studyArticle field from WrongAnswerEntry so wrong-answer review entries no longer carry Study Article data."
+          "description": "Tighten and clarify the publish + verification instructions to explicitly (a) require publishing via the Caffeine editor, (b) confirm that /env.json is injected at publish time, and (c) restate that frontend/public/env.json must not be manually edited for production. Ensure the doc points to the in-app diagnostics checks as the canonical verification method."
         },
         {
-          "path": "frontend/src/quiz/QuizGameplay.tsx",
+          "path": "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
           "operation": "modify",
-          "description": "Update wrongAnswersList assembly to stop reading/propagating Question.studyArticle into WrongAnswerEntry; ensure the wrong-answers data passed to results/review no longer includes study-article content."
+          "description": "Harden the /env.json verification UX to make it unambiguous when the backend canister ID is placeholder/empty vs valid, and to clearly instruct that fixing requires republishing via the Caffeine editor (not editing frontend/public/env.json). Verify the component's usage instructions before implementing."
         },
         {
-          "path": "frontend/src/App.tsx",
+          "path": "frontend/src/utils/runtimeEnvStatus.ts",
           "operation": "modify",
-          "description": "Remove StudyArticleView import and all wrong-answer-review-driven routing/state/handlers for study articles (e.g., selectedStudyQuestion, handleStudyQuestion, 'studyArticle' in the View union, and the 'studyArticle' rendering branch) so the study-article view is not reachable from the wrong-answers review flow."
+          "description": "Ensure runtime environment status messaging is explicit about the placeholder value and provides publish-flow-specific troubleshooting guidance suitable for production verification (without suggesting manual env.json edits)."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Fix frontend runtime configuration/deployment issues so builds succeed and missing/placeholder canister configuration is surfaced clearly.",
+      "summary": "Verify live deployment readiness using the in-app Deployment Diagnostics/Checklist, including runtime env status, backend canister ID resolution source, and health check.",
       "acceptanceCriteria": [
-        "The project builds successfully without triggering a configuration error.",
-        "The deployed preview can initialize the backend actor (i.e., does not fail immediately due to missing/invalid runtime configuration).",
-        "If the runtime configuration (/frontend/public/env.json) contains the placeholder canister id value (\"PLACEHOLDER_BACKEND_CANISTER_ID\"), the UI clearly surfaces this as a configuration problem (via existing diagnostics/connection error UI) and provides actionable steps, rather than failing silently."
+        "In the live deployment, the Deployment Diagnostics panel shows runtime environment status as loaded and not placeholder for the backend canister ID.",
+        "The Backend Connection section resolves the backend canister ID from `window.__ENV__.CANISTER_ID_BACKEND`.",
+        "Running the in-app health check succeeds (e.g., shows the backend is responding and returns backend version/system time).",
+        "Overall readiness status in the diagnostics indicates the app is ready with no critical warnings about canister ID resolution."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/declarations/backend/index.ts",
-          "operation": "create",
-          "description": "Add a checked-in backend declarations module that exports an idlFactory compatible with the app’s backendInterface, so production builds/deployments don’t depend on locally-generated dfx artifacts."
-        },
-        {
-          "path": "frontend/src/config/index.ts",
-          "operation": "modify",
-          "description": "Stop relying on a hard-coded dynamic import path to dfx-generated declarations; instead load the idlFactory from the checked-in frontend/src/declarations/backend module (and keep a safe fallback/error if it cannot be loaded)."
-        },
-        {
-          "path": "frontend/src/utils/canisterIdResolution.ts",
-          "operation": "modify",
-          "description": "Detect placeholder/invalid CANISTER_ID_BACKEND values early and throw a clear, actionable configuration error message (explicitly calling out the PLACEHOLDER_BACKEND_CANISTER_ID case) so the existing actor init error UI shows helpful guidance."
-        },
-        {
           "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Enhance the existing actor initialization error view to recognize configuration-related failures (especially the placeholder canister id case) and present actionable steps, aligning with the current diagnostics/connection error UI rather than failing silently."
+          "description": "Wire the Deployment Diagnostics / Deployment Checklist UI into the live app shell so it can be opened in production (e.g., from the header/footer) after login. Ensure the wiring does not introduce new top-level routes and is accessible for post-publish verification. Verify the component's usage instructions before implementing."
         },
         {
-          "path": "frontend/public/env.json",
+          "path": "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
           "operation": "modify",
-          "description": "Keep env.json valid and deploy-safe; ensure the placeholder guidance remains accurate and that the file structure is compatible with the runtime loader so deployment builds do not fail due to malformed config."
+          "description": "Ensure the 'Backend Connection' section explicitly displays the resolved canister ID and the resolution source, and highlights when the source is `window.__ENV__.CANISTER_ID_BACKEND` (required for live publish verification). Ensure the health check UI clearly reports success/failure and surfaces backendVersion/systemTime. Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/utils/actorConnectionInfo.ts",
+          "operation": "modify",
+          "description": "Ensure the connection-info utility used by diagnostics reliably labels the runtime-injected source as `window.__ENV__.CANISTER_ID_BACKEND` and propagates any resolution error text so the readiness evaluation can produce accurate critical warnings."
+        },
+        {
+          "path": "frontend/src/utils/liveReadiness.ts",
+          "operation": "modify",
+          "description": "Adjust readiness evaluation to treat missing/placeholder canister ID and non-runtime sources (when verifying production) as critical warnings, and to mark readiness as passing only when runtime env is loaded, canister ID is valid (non-placeholder), and health check succeeds."
         }
       ]
     }

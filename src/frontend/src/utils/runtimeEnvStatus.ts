@@ -1,195 +1,112 @@
-// Runtime environment configuration inspection
-// Helps troubleshoot missing or incomplete env.json configuration
+// Runtime environment configuration inspector
+// Checks window.__ENV__ status and provides detailed troubleshooting guidance
+
+export interface RuntimeEnvStatus {
+  status: 'loaded' | 'missing' | 'error' | 'loading' | 'invalid';
+  canisterId: string | null;
+  isPlaceholder: boolean;
+  message: string;
+  troubleshooting: string[];
+}
 
 const PLACEHOLDER_CANISTER_ID = 'PLACEHOLDER_BACKEND_CANISTER_ID';
 
-export interface RuntimeEnvStatus {
-  envJsonAccessible: boolean;
-  canisterIdPresent: boolean;
-  message: string;
-  troubleshootingSteps: string[];
-}
-
 /**
- * Checks if a canister ID value is valid (non-empty, not whitespace, and not a placeholder).
+ * Inspects the runtime environment configuration loaded from /env.json
+ * and returns a detailed status for diagnostics.
  */
-function isValidCanisterId(value: string | undefined | null): boolean {
-  if (!value || typeof value !== 'string') return false;
-  const trimmed = value.trim();
-  if (!trimmed) return false;
-  if (trimmed === PLACEHOLDER_CANISTER_ID) return false;
-  return true;
-}
+export function getRuntimeEnvStatus(): RuntimeEnvStatus {
+  // Check the load status marker set by index.html pre-bootstrap script
+  const loadStatus = (window as any).__ENV_LOAD_STATUS__;
+  const env = (window as any).__ENV__ || {};
+  const canisterId = env.CANISTER_ID_BACKEND || null;
 
-/**
- * Inspects runtime environment configuration and provides troubleshooting guidance.
- * Checks window.__ENV__ and attempts to determine if /env.json is accessible.
- */
-export async function inspectRuntimeEnv(): Promise<RuntimeEnvStatus> {
-  const envJson = window.__ENV__;
-  const loadStatus = window.__ENV_LOAD_STATUS__;
-  const canisterIdValue = envJson?.CANISTER_ID_BACKEND;
-  const canisterIdPresent = isValidCanisterId(canisterIdValue);
+  // Case 1: Still loading
+  if (loadStatus === 'loading') {
+    return {
+      status: 'loading',
+      canisterId: null,
+      isPlaceholder: false,
+      message: 'Runtime environment is still loading',
+      troubleshooting: ['Wait for the environment to finish loading', 'If this persists, try reloading the runtime configuration'],
+    };
+  }
 
-  // Check load status first (set by index.html pre-bootstrap script)
+  // Case 2: Missing /env.json
   if (loadStatus === 'missing') {
     return {
-      envJsonAccessible: false,
-      canisterIdPresent: false,
-      message: 'Runtime environment configuration is not loaded. The /env.json file is missing or unreachable.',
-      troubleshootingSteps: [
-        'Ensure /env.json exists in the deployed frontend assets.',
-        'Verify that /env.json is accessible from the browser (check network tab).',
-        `For live deployments, /env.json must contain a valid, non-placeholder CANISTER_ID_BACKEND value.`,
-        `The placeholder "${PLACEHOLDER_CANISTER_ID}" must be replaced with your actual backend canister ID.`,
-        'Publishing via the Caffeine editor should automatically replace the placeholder.',
-        'Example: { "CANISTER_ID_BACKEND": "rrkah-fqaaa-aaaaa-aaaaq-cai" }',
+      status: 'missing',
+      canisterId: null,
+      isPlaceholder: false,
+      message: '/env.json file not found or not accessible',
+      troubleshooting: [
+        'The /env.json file is required for live deployments and is automatically created during publish',
+        'To publish: Open your project in the Caffeine editor and click "Publish to Live"',
+        'The Caffeine editor will deploy your app and inject the correct backend canister ID into /env.json',
+        'Do NOT manually edit frontend/public/env.json - the Caffeine editor manages this file during publish',
+        'After publishing, verify the deployment using the in-app diagnostics panel',
       ],
     };
   }
 
+  // Case 3: Error loading /env.json
   if (loadStatus === 'error') {
     return {
-      envJsonAccessible: false,
-      canisterIdPresent: false,
-      message: 'Runtime environment configuration failed to load. The /env.json file is unreachable or contains invalid JSON.',
-      troubleshootingSteps: [
-        'Check that /env.json contains valid JSON syntax.',
-        'Verify that /env.json is accessible from the browser (check network tab).',
-        `Ensure CANISTER_ID_BACKEND is set to your actual backend canister ID (not "${PLACEHOLDER_CANISTER_ID}").`,
-        'Publishing via the Caffeine editor should automatically configure this.',
-        'Example: { "CANISTER_ID_BACKEND": "rrkah-fqaaa-aaaaa-aaaaq-cai" }',
+      status: 'error',
+      canisterId: null,
+      isPlaceholder: false,
+      message: 'Failed to load /env.json (network or parse error)',
+      troubleshooting: [
+        'Check browser console for detailed error messages',
+        'Verify /env.json is valid JSON',
+        'Ensure the file is accessible from your deployment',
+        'Try reloading the runtime configuration using the "Reload Runtime Config" button',
+        'If the issue persists, republish via the Caffeine editor to regenerate /env.json',
       ],
     };
   }
 
-  // Check if window.__ENV__ exists at all
-  if (!envJson) {
-    // Try to fetch /env.json with cache-busting to see if it's accessible
-    let envJsonAccessible = false;
-    try {
-      const response = await fetch(`/env.json?cb=${Date.now()}`, {
-        method: 'HEAD',
-        cache: 'no-store',
-      });
-      envJsonAccessible = response.ok;
-    } catch (e) {
-      envJsonAccessible = false;
-    }
-
-    if (!envJsonAccessible) {
-      return {
-        envJsonAccessible: false,
-        canisterIdPresent: false,
-        message: 'Runtime environment configuration is not loaded. The /env.json file is missing or unreachable.',
-        troubleshootingSteps: [
-          'Ensure /env.json exists in the deployed frontend assets.',
-          'Verify that /env.json is accessible from the browser (check network tab).',
-          `For live deployments, /env.json must contain a valid CANISTER_ID_BACKEND value (not "${PLACEHOLDER_CANISTER_ID}").`,
-          'Publishing via the Caffeine editor should automatically configure this.',
-          'Example: { "CANISTER_ID_BACKEND": "rrkah-fqaaa-aaaaa-aaaaq-cai" }',
-        ],
-      };
-    }
-
+  // Case 4: Loaded but canister ID is missing or empty
+  if (!canisterId || canisterId.trim() === '') {
     return {
-      envJsonAccessible: true,
-      canisterIdPresent: false,
-      message: 'Runtime environment is loaded but appears empty. The /env.json file exists but window.__ENV__ is not populated.',
-      troubleshootingSteps: [
-        'Check that /env.json contains valid JSON.',
-        'Verify that the pre-bootstrap script in index.html is loading /env.json correctly.',
-        `Ensure CANISTER_ID_BACKEND is defined in /env.json with a valid value (not "${PLACEHOLDER_CANISTER_ID}").`,
-        'Publishing via the Caffeine editor should automatically configure this.',
-        'Example: { "CANISTER_ID_BACKEND": "rrkah-fqaaa-aaaaa-aaaaq-cai" }',
+      status: 'invalid',
+      canisterId: null,
+      isPlaceholder: false,
+      message: 'CANISTER_ID_BACKEND is missing or empty in /env.json',
+      troubleshooting: [
+        'The /env.json file exists but CANISTER_ID_BACKEND is not set',
+        'This typically happens if the file was manually created without proper configuration',
+        'Solution: Publish your app via the Caffeine editor',
+        'The Caffeine editor will automatically inject the correct backend canister ID during publish',
+        'Do NOT manually edit frontend/public/env.json - let the Caffeine editor manage it',
       ],
     };
   }
 
-  // window.__ENV__ exists
-  if (!canisterIdPresent) {
-    const trimmedValue = canisterIdValue?.trim();
-    if (trimmedValue === PLACEHOLDER_CANISTER_ID) {
-      return {
-        envJsonAccessible: true,
-        canisterIdPresent: false,
-        message: `Runtime environment is loaded, but CANISTER_ID_BACKEND contains the placeholder value "${PLACEHOLDER_CANISTER_ID}".`,
-        troubleshootingSteps: [
-          `The placeholder value "${PLACEHOLDER_CANISTER_ID}" must be replaced with your actual backend canister ID.`,
-          'This should be done automatically by the Caffeine editor during publish.',
-          'If publishing via Caffeine editor, ensure the deployment configuration includes the backend canister ID.',
-          'Update /env.json with your real backend canister ID before the app can connect.',
-          'Example: { "CANISTER_ID_BACKEND": "rrkah-fqaaa-aaaaa-aaaaq-cai" }',
-          'See PUBLISHING.md for detailed instructions.',
-        ],
-      };
-    }
-    
+  // Case 5: Loaded but canister ID is the placeholder value
+  if (canisterId === PLACEHOLDER_CANISTER_ID) {
     return {
-      envJsonAccessible: true,
-      canisterIdPresent: false,
-      message: 'Runtime environment is loaded, but CANISTER_ID_BACKEND is missing or empty in window.__ENV__.',
-      troubleshootingSteps: [
-        `Add CANISTER_ID_BACKEND to /env.json with your backend canister ID (not "${PLACEHOLDER_CANISTER_ID}").`,
-        'For live deployments, this key is required for the app to connect to the backend.',
-        'Publishing via the Caffeine editor should automatically configure this.',
-        'Example: { "CANISTER_ID_BACKEND": "rrkah-fqaaa-aaaaa-aaaaq-cai" }',
-        'If publishing via Caffeine editor, ensure the deployment configuration includes the backend canister ID.',
-        'See PUBLISHING.md for detailed instructions.',
+      status: 'invalid',
+      canisterId: PLACEHOLDER_CANISTER_ID,
+      isPlaceholder: true,
+      message: `CANISTER_ID_BACKEND is set to placeholder value "${PLACEHOLDER_CANISTER_ID}"`,
+      troubleshooting: [
+        `The /env.json file contains the placeholder value "${PLACEHOLDER_CANISTER_ID}"`,
+        'This placeholder must be replaced with your actual backend canister ID',
+        'Solution: Publish your app via the Caffeine editor',
+        'The Caffeine editor will automatically replace the placeholder with the correct canister ID during publish',
+        'Do NOT manually edit frontend/public/env.json - the Caffeine editor manages this file',
+        'After publishing, use the "Verify /env.json" button in diagnostics to confirm the real canister ID was injected',
       ],
     };
   }
 
-  // All good
+  // Case 6: Successfully loaded with valid canister ID
   return {
-    envJsonAccessible: true,
-    canisterIdPresent: true,
-    message: 'Runtime environment is correctly configured.',
-    troubleshootingSteps: [],
-  };
-}
-
-/**
- * Synchronous check for immediate UI feedback.
- * Returns basic status without async fetch.
- */
-export function getRuntimeEnvStatusSync(): Pick<RuntimeEnvStatus, 'canisterIdPresent' | 'message'> {
-  const envJson = window.__ENV__;
-  const loadStatus = window.__ENV_LOAD_STATUS__;
-  const canisterIdValue = envJson?.CANISTER_ID_BACKEND;
-  const canisterIdPresent = isValidCanisterId(canisterIdValue);
-
-  if (loadStatus === 'missing' || loadStatus === 'error') {
-    return {
-      canisterIdPresent: false,
-      message: `Runtime environment (window.__ENV__) is not loaded or failed to load. Check that /env.json is accessible and contains a valid CANISTER_ID_BACKEND (not "${PLACEHOLDER_CANISTER_ID}"). Publishing via Caffeine editor should configure this automatically.`,
-    };
-  }
-
-  if (!envJson) {
-    return {
-      canisterIdPresent: false,
-      message: 'Runtime environment (window.__ENV__) is not loaded. Check that /env.json is accessible and properly configured via Caffeine editor publish.',
-    };
-  }
-
-  if (!canisterIdPresent) {
-    const trimmedValue = canisterIdValue?.trim();
-    if (trimmedValue === PLACEHOLDER_CANISTER_ID) {
-      return {
-        canisterIdPresent: false,
-        message: `CANISTER_ID_BACKEND contains the placeholder value "${PLACEHOLDER_CANISTER_ID}" in window.__ENV__. This must be replaced with your actual backend canister ID during Caffeine editor publish. See PUBLISHING.md for details.`,
-      };
-    }
-    
-    return {
-      canisterIdPresent: false,
-      message: `CANISTER_ID_BACKEND is missing or empty in window.__ENV__. Add a valid value (not "${PLACEHOLDER_CANISTER_ID}") to /env.json via Caffeine editor publish. See PUBLISHING.md for details.`,
-    };
-  }
-
-  return {
-    canisterIdPresent: true,
-    message: 'Runtime environment is correctly configured.',
+    status: 'loaded',
+    canisterId,
+    isPlaceholder: false,
+    message: 'Runtime environment loaded successfully with valid backend canister ID',
+    troubleshooting: [],
   };
 }

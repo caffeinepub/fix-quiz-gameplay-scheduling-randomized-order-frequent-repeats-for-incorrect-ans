@@ -1,209 +1,216 @@
-// Shared backend canister ID resolution with source tracking
-// Tries multiple sources in priority order and reports which source was used
+// Shared backend canister ID resolver with manual override support
+// Tries multiple sources in priority order and provides detailed resolution tracking
 
-const PLACEHOLDER_CANISTER_ID = 'PLACEHOLDER_BACKEND_CANISTER_ID';
+import { getActiveManualOverride } from './manualBackendCanisterOverride';
 
 export interface CanisterIdResolution {
   canisterId: string | null;
-  source: 'import.meta.env' | 'window.__ENV__' | 'declarations' | 'url-fallback' | 'none';
+  source: string;
   sourcesAttempted: string[];
   error?: string;
 }
 
-/**
- * Checks if a canister ID value is valid (non-empty and not a placeholder).
- */
-function isValidCanisterId(value: string | undefined | null): boolean {
-  if (!value || typeof value !== 'string') return false;
-  const trimmed = value.trim();
-  if (!trimmed) return false;
-  if (trimmed === PLACEHOLDER_CANISTER_ID) return false;
-  return true;
-}
+const PLACEHOLDER_CANISTER_ID = 'PLACEHOLDER_BACKEND_CANISTER_ID';
 
 /**
- * Attempts to load canister ID from generated declarations.
- * This is an async operation that tries to fetch canister_ids.json at runtime.
+ * Waits for runtime env.json to finish loading (with timeout).
+ * Returns true if loaded successfully, false if timeout or error.
  */
-async function tryLoadCanisterIdFromDeclarations(): Promise<string | null> {
-  try {
-    // Try to fetch canister_ids.json at runtime
-    // This file may not exist, so we handle errors gracefully
-    const response = await fetch('/canister_ids.json').catch(() => null);
+async function waitForRuntimeEnvLoad(timeoutMs: number = 3000): Promise<boolean> {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < timeoutMs) {
+    const loadStatus = (window as any).__ENV_LOAD_STATUS__;
     
-    if (!response || !response.ok) {
-      return null;
+    // If loaded successfully, return true
+    if (loadStatus === 'loaded') {
+      return true;
     }
     
-    const canisterIds = await response.json().catch(() => null);
-    
-    if (!canisterIds || typeof canisterIds !== 'object') {
-      return null;
+    // If error or missing, stop waiting
+    if (loadStatus === 'error' || loadStatus === 'missing') {
+      return false;
     }
     
-    // Check for backend canister ID in various possible keys
-    const backendId = 
-      canisterIds.backend?.ic ||
-      canisterIds.backend?.local ||
-      canisterIds.backend;
-    
-    if (isValidCanisterId(backendId)) {
-      return backendId.trim();
+    // If still loading, wait a bit and check again
+    if (loadStatus === 'loading') {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      continue;
     }
     
-    return null;
-  } catch (e) {
-    // Declarations not available or don't contain canister ID
-    return null;
+    // If no status marker, assume not loading
+    return false;
   }
+  
+  // Timeout reached
+  return false;
 }
 
 /**
- * Resolves the backend canister ID from multiple sources in priority order:
- * 1. Vite build-time environment variables (import.meta.env)
- * 2. Runtime environment (window.__ENV__)
- * 3. Generated backend declarations (canister_ids.json)
- * 4. URL-based fallback (only for local development)
- * 
- * Returns detailed resolution information including which source was used.
+ * Synchronous canister ID resolver with manual override support.
+ * Priority: (1) manual overrides, (2) runtime env.json, (3) build-time Vite env vars.
  */
 export function resolveBackendCanisterId(): CanisterIdResolution {
   const sourcesAttempted: string[] = [];
   
-  // 1. Try Vite build-time environment variables (import.meta.env)
-  sourcesAttempted.push('import.meta.env');
-  const viteCanisterId = 
-    import.meta.env.VITE_CANISTER_ID_BACKEND ||
-    import.meta.env.VITE_BACKEND_CANISTER_ID;
-  
-  if (isValidCanisterId(viteCanisterId)) {
+  // Priority 1: Manual overrides (URL query or localStorage)
+  const manualOverride = getActiveManualOverride();
+  if (manualOverride) {
+    const source = manualOverride.source === 'url' 
+      ? 'manual-override:url' 
+      : 'manual-override:localStorage';
+    sourcesAttempted.push(source);
+    
     return {
-      canisterId: (viteCanisterId as string).trim(),
-      source: 'import.meta.env',
+      canisterId: manualOverride.canisterId,
+      source,
       sourcesAttempted,
     };
   }
-
-  // 2. Try runtime environment (window.__ENV__)
-  sourcesAttempted.push('window.__ENV__');
-  try {
-    const envJson = window.__ENV__;
-    const runtimeCanisterId = envJson?.CANISTER_ID_BACKEND;
-    if (isValidCanisterId(runtimeCanisterId)) {
-      return {
-        canisterId: (runtimeCanisterId as string).trim(),
-        source: 'window.__ENV__',
-        sourcesAttempted,
-      };
-    }
-  } catch (e) {
-    // window.__ENV__ not available
-  }
-
-  // 3. Declarations fallback is async, so we can't use it in sync resolution
-  // Mark it as attempted but note it requires async resolution
-  sourcesAttempted.push('declarations (requires async)');
-
-  // 4. URL-based fallback (only safe for local development)
-  sourcesAttempted.push('url-fallback');
-  const hostname = window.location.hostname;
   
-  // Only use URL fallback for localhost (local development)
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    const localMatch = hostname.match(/^(localhost|127\.0\.0\.1)$/);
-    if (localMatch) {
-      // For local development, we can't extract from URL
-      // This should have been set via environment variables
+  // Check if runtime env is still loading
+  const loadStatus = (window as any).__ENV_LOAD_STATUS__;
+  if (loadStatus === 'loading') {
+    return {
+      canisterId: null,
+      source: 'none',
+      sourcesAttempted: ['window.__ENV__.CANISTER_ID_BACKEND'],
+      error: 'Runtime env.json is still loading. Please wait or retry.',
+    };
+  }
+  
+  // Priority 2: Runtime environment (window.__ENV__.CANISTER_ID_BACKEND from /env.json)
+  const runtimeEnv = (window as any).__ENV__;
+  if (runtimeEnv && runtimeEnv.CANISTER_ID_BACKEND) {
+    sourcesAttempted.push('window.__ENV__.CANISTER_ID_BACKEND');
+    const canisterId = runtimeEnv.CANISTER_ID_BACKEND;
+    
+    // Reject placeholder values
+    if (canisterId === PLACEHOLDER_CANISTER_ID) {
       return {
         canisterId: null,
         source: 'none',
         sourcesAttempted,
-        error: `Backend canister ID not configured. For production deployments, /env.json must contain a valid, non-placeholder CANISTER_ID_BACKEND value (not "${PLACEHOLDER_CANISTER_ID}"). For local development, set VITE_CANISTER_ID_BACKEND at build time.`,
+        error: `Runtime env.json contains placeholder value "${PLACEHOLDER_CANISTER_ID}". Publish via Caffeine editor to inject real canister ID.`,
       };
     }
-  }
-
-  // For production IC domains, DO NOT assume backend canister ID equals frontend canister ID
-  // The subdomain is the frontend canister, not the backend
-  const icDomainMatch = hostname.match(/^([a-z0-9-]+)\.(ic0\.app|icp0\.io)$/);
-  if (icDomainMatch) {
+    
+    // Reject empty values
+    if (!canisterId || canisterId.trim() === '') {
+      return {
+        canisterId: null,
+        source: 'none',
+        sourcesAttempted,
+        error: 'Runtime env.json CANISTER_ID_BACKEND is empty. Publish via Caffeine editor to configure.',
+      };
+    }
+    
     return {
-      canisterId: null,
-      source: 'none',
+      canisterId,
+      source: 'window.__ENV__.CANISTER_ID_BACKEND',
       sourcesAttempted,
-      error: `Backend canister ID not configured in deployment. The frontend canister ID (URL subdomain) cannot be used as the backend canister ID. Production deployments require /env.json to contain a valid, non-placeholder CANISTER_ID_BACKEND value (not "${PLACEHOLDER_CANISTER_ID}"). Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }`,
     };
   }
-
-  // No canister ID found from any source
+  
+  // Priority 3: Build-time Vite environment variables
+  const viteCanisterId = import.meta.env.VITE_CANISTER_ID_BACKEND || import.meta.env.VITE_BACKEND_CANISTER_ID;
+  if (viteCanisterId) {
+    sourcesAttempted.push('vite-env-vars');
+    
+    // Reject placeholder values
+    if (viteCanisterId === PLACEHOLDER_CANISTER_ID) {
+      return {
+        canisterId: null,
+        source: 'none',
+        sourcesAttempted,
+        error: `Build-time env contains placeholder value "${PLACEHOLDER_CANISTER_ID}".`,
+      };
+    }
+    
+    return {
+      canisterId: viteCanisterId,
+      source: 'vite-env-vars',
+      sourcesAttempted,
+    };
+  }
+  
+  sourcesAttempted.push('vite-env-vars');
+  
   return {
     canisterId: null,
     source: 'none',
     sourcesAttempted,
-    error: `Backend canister ID not configured. Production deployments require /env.json to contain a valid, non-placeholder CANISTER_ID_BACKEND value (not "${PLACEHOLDER_CANISTER_ID}"). Example: { "CANISTER_ID_BACKEND": "your-backend-canister-id" }`,
+    error: 'No backend canister ID found in runtime env.json or build-time environment variables.',
   };
 }
 
 /**
- * Async version that tries declarations fallback before giving up.
- * Use this when you can afford the async operation.
+ * Async canister ID resolver with runtime env.json wait and manual override support.
+ * Waits for runtime env.json to load (with timeout), then tries all sources.
  */
 export async function resolveBackendCanisterIdAsync(): Promise<CanisterIdResolution> {
-  // First try synchronous sources
+  // Check manual overrides first (they don't require waiting)
+  const manualOverride = getActiveManualOverride();
+  if (manualOverride) {
+    const source = manualOverride.source === 'url' 
+      ? 'manual-override:url' 
+      : 'manual-override:localStorage';
+    
+    return {
+      canisterId: manualOverride.canisterId,
+      source,
+      sourcesAttempted: [source],
+    };
+  }
+  
+  // Wait for runtime env.json to finish loading (if it's in progress)
+  const loadStatus = (window as any).__ENV_LOAD_STATUS__;
+  if (loadStatus === 'loading') {
+    console.log('[canisterIdResolution] Runtime env.json is loading, waiting...');
+    const loaded = await waitForRuntimeEnvLoad(3000);
+    if (loaded) {
+      console.log('[canisterIdResolution] Runtime env.json loaded successfully');
+    } else {
+      console.warn('[canisterIdResolution] Runtime env.json did not load within timeout');
+    }
+  }
+  
+  // Now try sync resolution
   const syncResolution = resolveBackendCanisterId();
   
-  // If we found a canister ID, return it
+  // If sync resolution succeeded, return it
   if (syncResolution.canisterId) {
     return syncResolution;
   }
   
-  // Try declarations fallback
+  // Try declarations fallback (informational only - declarations don't export canisterId)
   const sourcesAttempted = [...syncResolution.sourcesAttempted];
-  const declarationsCanisterId = await tryLoadCanisterIdFromDeclarations();
+  sourcesAttempted.push('checked-in-declarations');
   
-  if (declarationsCanisterId) {
-    return {
-      canisterId: declarationsCanisterId,
-      source: 'declarations',
-      sourcesAttempted,
-    };
-  }
+  // Declarations module doesn't export canisterId, so we can't use it as a fallback
+  // This is just for tracking that we attempted this source
   
-  // Still no canister ID found
   return {
-    ...syncResolution,
+    canisterId: null,
+    source: 'none',
     sourcesAttempted,
+    error: syncResolution.error || 'No backend canister ID found in any source.',
   };
 }
 
 /**
- * Gets the backend canister ID or throws a clear error.
- * Use this when you need the canister ID and cannot proceed without it.
- */
-export function getBackendCanisterIdOrThrow(): string {
-  const resolution = resolveBackendCanisterId();
-  
-  if (!resolution.canisterId) {
-    const errorMessage = resolution.error || 'Backend canister ID not found';
-    const sourcesMsg = `Attempted sources: ${resolution.sourcesAttempted.join(', ')}`;
-    throw new Error(`${errorMessage}\n${sourcesMsg}`);
-  }
-  
-  return resolution.canisterId;
-}
-
-/**
- * Async version that tries declarations fallback before throwing.
+ * Helper that throws if canister ID cannot be resolved.
+ * Used by actor initialization to fail fast with clear error.
  */
 export async function getBackendCanisterIdOrThrowAsync(): Promise<string> {
   const resolution = await resolveBackendCanisterIdAsync();
   
   if (!resolution.canisterId) {
-    const errorMessage = resolution.error || 'Backend canister ID not found';
-    const sourcesMsg = `Attempted sources: ${resolution.sourcesAttempted.join(', ')}`;
-    throw new Error(`${errorMessage}\n${sourcesMsg}`);
+    const sourcesStr = resolution.sourcesAttempted.join(', ');
+    throw new Error(
+      `Backend canister ID not resolved. Attempted sources: ${sourcesStr}. ${resolution.error || 'No canister ID available.'}`
+    );
   }
   
   return resolution.canisterId;
 }
-

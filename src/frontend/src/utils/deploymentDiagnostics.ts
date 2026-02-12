@@ -9,7 +9,7 @@ export interface DiagnosticError {
   stack?: string;
   timestamp: string;
   context?: string;
-  type: 'error' | 'unhandledRejection' | 'actorInit' | 'runtime' | 'retry' | 'forceRefresh';
+  type: 'error' | 'unhandledRejection' | 'actorInit' | 'runtime' | 'retry' | 'forceRefresh' | 'hardRefresh';
   metadata?: {
     host?: string;
     canisterId?: string | null;

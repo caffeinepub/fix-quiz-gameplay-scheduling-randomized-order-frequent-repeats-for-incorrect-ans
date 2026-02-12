@@ -1,64 +1,66 @@
 {
   "kind": "build_request",
-  "title": "Remove study-article access from Wrong Answers Review and resolve deployment configuration failure",
-  "priority": "high",
+  "title": "Publish current draft to production and verify backend canister ID injection",
+  "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Remove the educational/study-article functionality from the Wrong Answers Review flow so users cannot open or view a Study Article from the wrong-question review experience.",
-      "target": "frontend",
+      "text": "Publish the current draft build to the live (production) deployment using the Caffeine editor publish flow (the app cannot self-publish). Ensure the publish process injects a real backend canister ID into the live `/env.json` so `CANISTER_ID_BACKEND` is not the placeholder value `PLACEHOLDER_BACKEND_CANISTER_ID`.",
+      "target": "unknown",
       "source": {
         "messageIds": [
-          "msg-4",
-          "msg-8"
+          "msg-4"
         ],
         "quotes": [
-          "Remove educational article function from wrong guestion review as I asking before, it is still there",
-          "yes, fix it and run again"
+          "now it looks good, publish this version to production"
         ]
       },
       "acceptanceCriteria": [
-        "The Wrong Answers Review screen (frontend/src/quiz/WrongAnswersReview.tsx) contains no UI affordance to open a study article (no click-to-open behavior, buttons, links, or navigation).",
-        "The app no longer navigates to the Study Article view from any wrong-answers review action; the 'studyArticle' view is not reachable through the wrong-answer review flow.",
-        "Wrong answer review entries no longer carry or rely on a 'studyArticle' field in the frontend data flow (update frontend/src/quiz/wrongAnswerTypes.ts and the place where wrong-answers are assembled in frontend/src/quiz/QuizGameplay.tsx accordingly).",
-        "Any now-unused state, handlers, imports, and view routing related to opening StudyArticleView from wrong-answer review are removed from frontend/src/App.tsx (e.g., selectedStudyQuestion, handleStudyQuestion, and the 'studyArticle' view branch), without breaking other views."
+        "A live (production) deployment is created from the current draft build via the Caffeine editor publish action.",
+        "In the live deployment, fetching `/env.json` returns a JSON object with `CANISTER_ID_BACKEND` set to a non-empty, non-placeholder value (not `PLACEHOLDER_BACKEND_CANISTER_ID`).",
+        "No manual edits are made to `frontend/public/env.json` as part of the publish process."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix the configuration issue preventing builds/deployments from running successfully, and ensure the app can be rebuilt and redeployed after the fix.",
-      "target": "both",
+      "text": "After publishing, verify the live deployment using the in-app Deployment Diagnostics / Deployment Checklist tools to confirm backend connectivity and readiness.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-6",
-          "msg-7",
-          "msg-8"
+          "msg-4"
         ],
         "quotes": [
-          "⚠️ Configuration error found. Please contact the Caffeine team for assistance.",
-          "It looks like the last build hit a configuration issue — want me to try running it again now?",
-          "yes, fix it and run again"
+          "now it looks good, publish this version to production"
         ]
       },
       "acceptanceCriteria": [
-        "The project builds successfully without triggering a configuration error.",
-        "The deployed preview can initialize the backend actor (i.e., does not fail immediately due to missing/invalid runtime configuration).",
-        "If the runtime configuration (/frontend/public/env.json) contains the placeholder canister id value (\"PLACEHOLDER_BACKEND_CANISTER_ID\"), the UI clearly surfaces this as a configuration problem (via existing diagnostics/connection error UI) and provides actionable steps, rather than failing silently."
+        "In the live deployment, the Deployment Diagnostics panel shows runtime environment status as loaded and not placeholder for the backend canister ID.",
+        "The Backend Connection section resolves the backend canister ID from `window.__ENV__.CANISTER_ID_BACKEND`.",
+        "Running the in-app health check succeeds (e.g., shows the backend is responding and returns backend version/system time).",
+        "Overall readiness status in the diagnostics indicates the app is ready with no critical warnings about canister ID resolution."
       ]
     }
   ],
   "constraints": [
-    "Do not edit files under frontend/src/components/ui (read-only Shadcn components).",
-    "Do not edit frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, or frontend/src/main.tsx (immutable paths).",
-    "Keep all backend logic in the single Motoko actor (backend/main.mo); only add backend/migration.mo if a stable-state schema change is required."
+    "Publishing must be performed through the Caffeine editor (the app cannot self-publish).",
+    "Do not manually edit `frontend/public/env.json` for production; it must be injected during publish."
   ],
   "nonGoals": [
-    "Do not remove the general quiz gameplay, scoring, or translation features.",
-    "Do not add new authentication providers beyond Internet Identity.",
-    "Do not introduce external databases or non-Motoko backend services."
+    "Implementing new product features or UI changes unrelated to publishing.",
+    "Changing backend APIs or data schema as part of this publish request."
   ],
   "imageRequirements": {
     "required": [],
     "edits": []
+  },
+  "userProfileUpdate": {
+    "goalsToAdd": [],
+    "goalsToRemove": [],
+    "preferencesToAdd": [],
+    "preferencesToRemove": [],
+    "miscToAdd": [],
+    "miscToRemove": [],
+    "fieldsToSet": {},
+    "fieldsToDelete": []
   }
 }

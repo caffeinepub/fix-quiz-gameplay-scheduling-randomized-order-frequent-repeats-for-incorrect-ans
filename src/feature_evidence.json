@@ -2,12 +2,12 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-remove-the-educational-study-article-functionality-from-the-wrong-answers-review-flow-so-users-cannot-open-or-view-a-study-article-from-the-wrong-question-review-experience",
-      "featureTitle": "Remove the educational/study-article functionality from the Wrong Answers Review flow so users cannot open or view a Study Article from the wrong-question review experience.",
+      "featureId": "feature-publish-the-current-draft-build-to-the-live-production-deployment-using-the-caffeine-editor-publish-flow-the-app-cannot-self-publish-ensure-the-publish-process-injects-a-real-backend-canister-id-into-the-live-env-json-so-canister-id-backend-is-not-the-placeholder-value-placeholder-backend-canister-id",
+      "featureTitle": "Publish the current draft build to the live (production) deployment using the Caffeine editor publish flow (the app cannot self-publish). Ensure the publish process injects a real backend canister ID into the live `/env.json` so `CANISTER_ID_BACKEND` is not the placeholder value `PLACEHOLDER_BACKEND_CANISTER_ID`.",
       "files": [
-        "frontend/src/App.tsx",
-        "frontend/src/quiz/QuizGameplay.tsx",
-        "frontend/src/quiz/wrongAnswerTypes.ts"
+        "frontend/PUBLISHING.md",
+        "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+        "frontend/src/utils/runtimeEnvStatus.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -24,11 +24,12 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-the-configuration-issue-preventing-builds-deployments-from-running-successfully-and-ensure-the-app-can-be-rebuilt-and-redeployed-after-the-fix",
-      "featureTitle": "Fix the configuration issue preventing builds/deployments from running successfully, and ensure the app can be rebuilt and redeployed after the fix.",
+      "featureId": "feature-after-publishing-verify-the-live-deployment-using-the-in-app-deployment-diagnostics-deployment-checklist-tools-to-confirm-backend-connectivity-and-readiness",
+      "featureTitle": "After publishing, verify the live deployment using the in-app Deployment Diagnostics / Deployment Checklist tools to confirm backend connectivity and readiness.",
       "files": [
         "frontend/src/App.tsx",
-        "frontend/src/config/index.ts"
+        "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+        "frontend/src/utils/liveReadiness.ts"
       ],
       "components": [
         "authorization@4.0.0",

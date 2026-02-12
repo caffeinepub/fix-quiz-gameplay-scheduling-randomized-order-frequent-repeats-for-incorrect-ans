@@ -1,45 +1,32 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Application with a 'wrong question review' feature; user requests removing the educational article function from that review and resolving a deployment/build configuration error.",
-  "architectural_notes": [],
-  "known_issues": [
-    "Build/deployment is failing due to a configuration error (requires fix before rerunning build)."
+  "summary": "New project",
+  "architectural_notes": [
+    "User approved publishing the current draft version to production."
   ],
-  "isFixRequest": true,
+  "known_issues": [],
+  "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-remove-the-educational-study-article-functionality-from-the-wrong-answers-review-flow-so-users-cannot-open-or-view-a-study-article-from-the-wrong-question-review-experience",
-      "title": "Remove the educational/study-article functionality from the Wrong Answers Review flow so users cannot open or view a Study Article from the wrong-question review experience.",
+      "id": "feature-publish-the-current-draft-build-to-the-live-production-deployment-using-the-caffeine-editor-publish-flow-the-app-cannot-self-publish-ensure-the-publish-process-injects-a-real-backend-canister-id-into-the-live-env-json-so-canister-id-backend-is-not-the-placeholder-value-placeholder-backend-canister-id",
+      "title": "Publish the current draft build to the live (production) deployment using the Caffeine editor publish flow (the app cannot self-publish). Ensure the publish process injects a real backend canister ID into the live `/env.json` so `CANISTER_ID_BACKEND` is not the placeholder value `PLACEHOLDER_BACKEND_CANISTER_ID`.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-fix-the-configuration-issue-preventing-builds-deployments-from-running-successfully-and-ensure-the-app-can-be-rebuilt-and-redeployed-after-the-fix",
-      "title": "Fix the configuration issue preventing builds/deployments from running successfully, and ensure the app can be rebuilt and redeployed after the fix.",
+      "id": "feature-after-publishing-verify-the-live-deployment-using-the-in-app-deployment-diagnostics-deployment-checklist-tools-to-confirm-backend-connectivity-and-readiness",
+      "title": "After publishing, verify the live deployment using the in-app Deployment Diagnostics / Deployment Checklist tools to confirm backend connectivity and readiness.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     }
   ],
-  "new_feature_requests": [
-    {
-      "id": "AR-1",
-      "summary": "Remove the educational article function from the 'wrong question review' section.",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Fix the build/deployment configuration error and rerun the build.",
-      "reqIds": [],
-      "status": "pending"
-    }
-  ],
-  "projectName": "Remove study-article access from Wrong Answers Review and resolve deployment configuration failure",
+  "new_feature_requests": [],
+  "projectName": "Publish current draft to production and verify backend canister ID injection",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

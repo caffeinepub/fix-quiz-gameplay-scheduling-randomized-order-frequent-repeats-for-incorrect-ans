@@ -1,7 +1,7 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-12T09:31:15.161Z",
+  "generatedAt": "2026-02-12T17:37:09.204Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
@@ -12,34 +12,33 @@
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Remove the educational/study-article functionality from the Wrong Answers Review flow so users cannot open or view a Study Article from the wrong-question review experience.",
+        "summary": "Publish the current draft build to the live (production) deployment using the Caffeine editor publish flow (the app cannot self-publish). Ensure the publish process injects a real backend canister ID into the live `/env.json` so `CANISTER_ID_BACKEND` is not the placeholder value `PLACEHOLDER_BACKEND_CANISTER_ID`.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/quiz/wrongAnswerTypes.ts",
-          "frontend/src/quiz/QuizGameplay.tsx",
-          "frontend/src/App.tsx"
+          "frontend/PUBLISHING.md",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "frontend/src/utils/runtimeEnvStatus.ts"
         ],
         "matchedFiles": [
-          "frontend/src/quiz/wrongAnswerTypes.ts",
-          "frontend/src/quiz/QuizGameplay.tsx",
-          "frontend/src/App.tsx"
+          "frontend/PUBLISHING.md",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "frontend/src/utils/runtimeEnvStatus.ts"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Fix the configuration issue preventing builds/deployments from running successfully, and ensure the app can be rebuilt and redeployed after the fix.",
+        "summary": "After publishing, verify the live deployment using the in-app Deployment Diagnostics / Deployment Checklist tools to confirm backend connectivity and readiness.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/declarations/backend/index.ts",
-          "frontend/src/config/index.ts",
-          "frontend/src/utils/canisterIdResolution.ts",
           "frontend/src/App.tsx",
-          "frontend/public/env.json"
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "frontend/src/utils/actorConnectionInfo.ts",
+          "frontend/src/utils/liveReadiness.ts"
         ],
         "matchedFiles": [
-          "frontend/src/declarations/backend/index.ts",
-          "frontend/src/config/index.ts",
-          "frontend/src/App.tsx"
+          "frontend/src/App.tsx",
+          "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+          "frontend/src/utils/liveReadiness.ts"
         ]
       }
     ]
@@ -49,12 +48,11 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/PUBLISHING.md",
     "frontend/src/App.tsx",
-    "frontend/src/config/index.ts",
-    "frontend/src/declarations/backend/index.ts",
-    "frontend/src/quiz/QuizGameplay.tsx",
-    "frontend/src/quiz/WrongAnswersReview.tsx",
-    "frontend/src/quiz/wrongAnswerTypes.ts",
+    "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+    "frontend/src/utils/liveReadiness.ts",
+    "frontend/src/utils/runtimeEnvStatus.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

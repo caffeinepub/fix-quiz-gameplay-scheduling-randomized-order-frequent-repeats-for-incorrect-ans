@@ -1,420 +1,410 @@
 import { useState, useEffect } from 'react';
 import { useInternetIdentity } from './hooks/useInternetIdentity';
 import { useGetCallerUserProfile, useIsAdmin } from './hooks/useQueries';
-import { useQueryClient } from '@tanstack/react-query';
+import { useActor } from './hooks/useActor';
 import LoginButton from './components/LoginButton';
 import ProfileSetup from './components/ProfileSetup';
 import QuizEditor from './quiz/QuizEditor';
-import QuizGameplay from './quiz/QuizGameplay';
-import QuizResults from './quiz/QuizResults';
-import WrongAnswersReview from './quiz/WrongAnswersReview';
 import DeploymentDiagnosticsPanel from './components/DeploymentDiagnosticsPanel';
-import BuildIdentityFooter from './components/BuildIdentityFooter';
-import AppHeaderBrand from './components/AppHeaderBrand';
-import PendingUpdateBanner from './components/PendingUpdateBanner';
-import { Edit, Play, Bug, AlertTriangle, RefreshCw, Power, ClipboardCheck } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, Copy, CheckCircle2, ClipboardCheck } from 'lucide-react';
 import { Button } from './components/ui/button';
-import { Toaster } from './components/ui/sonner';
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { diagnostics } from './utils/deploymentDiagnostics';
+import { Separator } from './components/ui/separator';
+import PendingUpdateBanner from './components/PendingUpdateBanner';
+import BuildIdentityFooter from './components/BuildIdentityFooter';
+import AppHeaderBrand from './components/AppHeaderBrand';
+import { ManualBackendCanisterIdOverridePanel } from './components/ManualBackendCanisterIdOverridePanel';
+import { getRuntimeEnvStatus } from './utils/runtimeEnvStatus';
+import { reloadRuntimeEnv } from './utils/runtimeEnvReload';
+import { shareLiveVerificationInfo } from './utils/shareLiveVerificationInfo';
 import { getBuildInfo } from './utils/buildStamp';
-import { getActorConnectionInfo } from './utils/actorConnectionInfo';
-import { refreshToLatestBuild } from './utils/refreshToLatestBuild';
-import { detectStoppedCanister, formatStoppedCanisterMessage, getStoppedCanisterRecoverySteps } from './utils/stoppedCanisterDetection';
-import type { WrongAnswerEntry } from './quiz/wrongAnswerTypes';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { HealthCheckResult } from './backend';
 
-type View = 'editor' | 'gameplay' | 'results' | 'wrongAnswersReview';
-
-const ACTIVE_QUIZ_ID = 'TN intelligence Quiz';
-
-export default function App() {
-  const { identity } = useInternetIdentity();
+function App() {
+  const { identity, isInitializing: authInitializing } = useInternetIdentity();
+  const { actor, isFetching: actorFetching } = useActor();
   const queryClient = useQueryClient();
   const isAuthenticated = !!identity;
 
   const {
     data: userProfile,
     isLoading: profileLoading,
-    isFetched,
+    isFetched: profileFetched,
   } = useGetCallerUserProfile();
 
-  const { data: isAdmin = false } = useIsAdmin();
+  const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
 
-  const [currentView, setCurrentView] = useState<View>('gameplay');
-  const [sessionScore, setSessionScore] = useState({ correct: 0, total: 0 });
-  const [wrongAnswers, setWrongAnswers] = useState<WrongAnswerEntry[]>([]);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
-  const [focusPublishSection, setFocusPublishSection] = useState(false);
+  const [actorInitError, setActorInitError] = useState<Error | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [isInActiveQuiz, setIsInActiveQuiz] = useState(false);
+  const [isReloadingEnv, setIsReloadingEnv] = useState(false);
+  const [reloadEnvMessage, setReloadEnvMessage] = useState<string | null>(null);
+  const [diagnosticsReport, setDiagnosticsReport] = useState<string | null>(null);
+  const [isCopyingReport, setIsCopyingReport] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [showDiagnosticsPanel, setShowDiagnosticsPanel] = useState(false);
 
-  // Check for debug flag in URL
+  // Health check query for diagnostics
+  const healthCheckQuery = useQuery<HealthCheckResult>({
+    queryKey: ['healthCheck'],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.healthCheck();
+    },
+    enabled: false, // Only run manually
+    retry: false,
+  });
+
+  // Capture actor initialization errors
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('debug') === 'true' || params.get('diagnostics') === 'true') {
-      setShowDiagnostics(true);
+    if (actorFetching) {
+      setActorInitError(null);
     }
-  }, []);
+  }, [actorFetching]);
 
-  // Monitor actor initialization state
-  const actorQuery = queryClient.getQueryState(['actor', identity?.getPrincipal().toString()]);
-  const actorError = actorQuery?.error as Error | undefined;
-  const actorFailed = actorQuery?.status === 'error';
-
-  // Detect stopped-canister error
-  const stoppedCanisterInfo = actorError ? detectStoppedCanister(actorError) : { isStopped: false, canisterId: null, originalError: '' };
-
-  // Capture actor initialization failures for diagnostics
   useEffect(() => {
-    if (actorFailed && actorError) {
-      const buildInfo = getBuildInfo();
-      const stoppedInfo = detectStoppedCanister(actorError);
-      
-      diagnostics.captureError(
-        actorError,
-        `Actor initialization failed at ${new Date().toISOString()} | Build: ${buildInfo.version} (${buildInfo.deploymentId}) | Environment: ${buildInfo.environment}`,
-        'actorInit',
-        stoppedInfo.isStopped ? 'canisterStopped' : undefined,
-        stoppedInfo.canisterId || undefined
-      );
+    if (!actorFetching && !actor) {
+      const runtimeEnvStatus = getRuntimeEnvStatus();
+      if (runtimeEnvStatus.status === 'loading') {
+        // Don't set error while runtime env is loading
+        return;
+      }
+      setActorInitError(new Error('Actor initialization failed'));
     }
-  }, [actorFailed, actorError]);
+  }, [actor, actorFetching]);
 
-  const handleQuizComplete = (correct: number, total: number, wrongAnswersList: WrongAnswerEntry[]) => {
-    setSessionScore({ correct, total });
-    setWrongAnswers(wrongAnswersList);
-    setCurrentView('results');
-  };
+  // Auto-retry when runtime env.json transitions to loaded
+  useEffect(() => {
+    const runtimeEnvStatus = getRuntimeEnvStatus();
+    if (
+      actorInitError &&
+      runtimeEnvStatus.status === 'loaded' &&
+      !runtimeEnvStatus.isPlaceholder &&
+      runtimeEnvStatus.canisterId
+    ) {
+      console.log('[App] Runtime env.json is now valid, triggering auto-retry...');
+      handleRetry();
+    }
+  }, [actorInitError]);
 
-  const handleReviewWrongAnswers = () => {
-    setCurrentView('wrongAnswersReview');
-  };
-
-  const handleBackToResults = () => {
-    setCurrentView('results');
-  };
-
-  const handlePlayAgain = () => {
-    setCurrentView('gameplay');
-  };
-
-  const handleStartQuiz = () => {
-    setCurrentView('gameplay');
-  };
-
-  const handleRetryConnection = async () => {
+  const handleRetry = () => {
     setIsRetrying(true);
+    setActorInitError(null);
+    setReloadEnvMessage(null);
+    
+    // Force actor re-initialization by reloading the page
+    // This is the most reliable way to ensure all state is reset
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
+  };
+
+  const handleReloadRuntimeEnv = async () => {
+    setIsReloadingEnv(true);
+    setReloadEnvMessage(null);
+    
     try {
-      await queryClient.invalidateQueries({ queryKey: ['actor'] });
-      await queryClient.invalidateQueries({ queryKey: ['adminInit'] });
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await reloadRuntimeEnv();
+      setReloadEnvMessage(result.message);
+      
+      if (result.success) {
+        // If reload succeeded, trigger retry after a short delay
+        setTimeout(() => {
+          handleRetry();
+        }, 1000);
+      }
+    } catch (error: any) {
+      setReloadEnvMessage(`Error: ${error.message || 'Unknown error'}`);
     } finally {
-      setIsRetrying(false);
+      setIsReloadingEnv(false);
     }
   };
 
-  const handleHardRefresh = () => {
-    refreshToLatestBuild();
+  const handleCopyDiagnostics = async () => {
+    setIsCopyingReport(true);
+    setCopySuccess(false);
+    
+    try {
+      const buildInfo = getBuildInfo();
+      const report = await shareLiveVerificationInfo(
+        buildInfo,
+        healthCheckQuery.data || null,
+        healthCheckQuery.error ? String(healthCheckQuery.error) : null
+      );
+      
+      setDiagnosticsReport(report);
+      await navigator.clipboard.writeText(report);
+      setCopySuccess(true);
+      
+      setTimeout(() => {
+        setCopySuccess(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to copy diagnostics:', error);
+    } finally {
+      setIsCopyingReport(false);
+    }
   };
 
   const handleProfileSetupComplete = () => {
+    // Invalidate profile query to refetch
     queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
   };
 
-  const handleOpenPublishPanel = () => {
-    setShowDiagnostics(true);
-    setFocusPublishSection(true);
-  };
+  // Show loading while auth or actor is initializing
+  const isInitializing = authInitializing || actorFetching;
 
-  const handleCloseDiagnostics = () => {
-    setShowDiagnostics(false);
-    setFocusPublishSection(false);
-  };
+  // Check runtime env status
+  const runtimeEnvStatus = getRuntimeEnvStatus();
+  const isRuntimeEnvLoading = runtimeEnvStatus.status === 'loading';
 
-  const showProfileSetup = isAuthenticated && !profileLoading && isFetched && userProfile === null;
-
-  // Unauthenticated view
-  if (!isAuthenticated) {
+  // Prioritize runtime env loading state
+  if (isRuntimeEnvLoading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <AppHeaderBrand />
-              <LoginButton />
-            </div>
-          </div>
-        </header>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading Configuration
+            </CardTitle>
+            <CardDescription>
+              Loading runtime environment configuration...
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Please wait while the application loads its configuration from the server.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-        <main className="flex-1 flex items-center justify-center p-6">
-          <Card className="max-w-md w-full shadow-cyber">
-            <CardHeader className="text-center">
-              <CardTitle className="text-3xl mb-2">Welcome to Quiz Master</CardTitle>
-              <CardDescription className="text-base">
-                Please log in to access the quiz platform
+  // Show configuration error screen if actor failed to initialize
+  if (actorInitError && !isRetrying) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl space-y-4">
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                Configuration Error
+              </CardTitle>
+              <CardDescription>
+                The backend canister ID could not be resolved from the runtime configuration.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex justify-center">
-              <LoginButton />
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>What's happening?</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>{runtimeEnvStatus.message}</p>
+                  {runtimeEnvStatus.troubleshooting.length > 0 && (
+                    <div className="mt-2">
+                      <p className="font-semibold">How to fix this:</p>
+                      <ul className="list-disc list-inside space-y-1 mt-1">
+                        {runtimeEnvStatus.troubleshooting.map((step, idx) => (
+                          <li key={idx} className="text-sm">{step}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm">Quick Actions</h3>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={handleReloadRuntimeEnv} disabled={isReloadingEnv} variant="default">
+                    {isReloadingEnv ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Reloading...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Reload Runtime Config
+                      </>
+                    )}
+                  </Button>
+
+                  <Button onClick={handleRetry} disabled={isRetrying} variant="outline">
+                    {isRetrying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Retrying...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Retry Connection
+                      </>
+                    )}
+                  </Button>
+
+                  <Button 
+                    onClick={handleCopyDiagnostics} 
+                    disabled={isCopyingReport}
+                    variant="outline"
+                  >
+                    {isCopyingReport ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : copySuccess ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Diagnostics
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {reloadEnvMessage && (
+                  <Alert variant={reloadEnvMessage.includes('Error') ? 'destructive' : 'default'}>
+                    <AlertDescription>{reloadEnvMessage}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              <Separator />
+
+              <ManualBackendCanisterIdOverridePanel onRetry={handleRetry} />
+
+              {diagnosticsReport && (
+                <div className="mt-4">
+                  <details className="text-xs">
+                    <summary className="cursor-pointer font-semibold mb-2">
+                      View Full Diagnostics Report
+                    </summary>
+                    <pre className="bg-muted p-3 rounded overflow-x-auto whitespace-pre-wrap break-words">
+                      {diagnosticsReport}
+                    </pre>
+                  </details>
+                </div>
+              )}
             </CardContent>
           </Card>
-        </main>
 
-        <BuildIdentityFooter />
-        <Toaster />
+          <BuildIdentityFooter />
+        </div>
       </div>
     );
   }
 
-  // Actor initialization error view
-  if (actorFailed) {
-    const buildInfo = getBuildInfo();
-    const connectionInfo = getActorConnectionInfo();
-
+  // Show loading screen during initialization
+  if (isInitializing) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <header className="border-b border-border bg-card/50 backdrop-blur-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <AppHeaderBrand />
-              <LoginButton />
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 p-6">
-          <div className="max-w-3xl mx-auto space-y-6">
-            {stoppedCanisterInfo.isStopped ? (
-              <Alert variant="destructive" className="border-2">
-                <Power className="h-5 w-5" />
-                <AlertTitle className="text-lg font-semibold mb-2">Backend Canister Stopped</AlertTitle>
-                <AlertDescription className="space-y-3">
-                  <p className="text-base">{formatStoppedCanisterMessage(stoppedCanisterInfo)}</p>
-                  <div className="bg-destructive/10 p-4 rounded-lg space-y-2 text-sm">
-                    <p className="font-semibold">Recovery Steps:</p>
-                    <div className="space-y-1 pl-4">
-                      {getStoppedCanisterRecoverySteps(connectionInfo.network === 'local').map((step, idx) => (
-                        <p key={idx}>• {step}</p>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <Button
-                      onClick={handleRetryConnection}
-                      disabled={isRetrying}
-                      variant="default"
-                      size="sm"
-                    >
-                      {isRetrying ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                          Retrying...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Retry Connection
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      onClick={() => setShowDiagnostics(!showDiagnostics)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Bug className="h-4 w-4 mr-2" />
-                      {showDiagnostics ? 'Hide' : 'Show'} Diagnostics
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Alert variant="destructive" className="border-2">
-                <AlertTriangle className="h-5 w-5" />
-                <AlertTitle className="text-lg font-semibold mb-2">Connection Error</AlertTitle>
-                <AlertDescription className="space-y-3">
-                  <p className="text-base">Unable to connect to the backend service.</p>
-                  <div className="bg-destructive/10 p-3 rounded-lg">
-                    <p className="text-sm font-mono break-all">
-                      {actorError?.message || 'Unknown error'}
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={handleRetryConnection}
-                      disabled={isRetrying}
-                      variant="default"
-                      size="sm"
-                    >
-                      {isRetrying ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                          Retrying...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Retry Connection
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      onClick={handleHardRefresh}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Power className="h-4 w-4 mr-2" />
-                      Hard Refresh
-                    </Button>
-                    <Button
-                      onClick={() => setShowDiagnostics(!showDiagnostics)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Bug className="h-4 w-4 mr-2" />
-                      {showDiagnostics ? 'Hide' : 'Show'} Diagnostics
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {showDiagnostics && (
-              <DeploymentDiagnosticsPanel
-                onClose={handleCloseDiagnostics}
-                focusPublishSection={focusPublishSection}
-              />
-            )}
-          </div>
-        </main>
-
-        <BuildIdentityFooter />
-        <Toaster />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Initializing application...</p>
+        </div>
       </div>
     );
   }
 
-  // Profile setup modal
+  // Show profile setup if authenticated but no profile
+  const showProfileSetup = isAuthenticated && !profileLoading && profileFetched && userProfile === null;
+
   if (showProfileSetup) {
     return (
       <div className="min-h-screen bg-background">
         <ProfileSetup onComplete={handleProfileSetupComplete} />
-        <Toaster />
       </div>
     );
   }
 
-  // Main authenticated view
+  // Main application
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {!isInActiveQuiz && (
-        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <AppHeaderBrand />
-              <div className="flex items-center gap-3">
-                {isAdmin && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant={currentView === 'editor' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setCurrentView('editor')}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editor
-                    </Button>
-                    <Button
-                      variant={currentView === 'gameplay' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setCurrentView('gameplay')}
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Play
-                    </Button>
-                  </div>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleOpenPublishPanel}
-                  className="hidden sm:flex"
-                  title="View deployment diagnostics and publishing checklist (publishing happens via Caffeine editor)"
-                >
-                  <ClipboardCheck className="h-4 w-4 mr-2" />
-                  Deployment Checklist
-                </Button>
-                <LoginButton />
-              </div>
-            </div>
+      <PendingUpdateBanner />
+      
+      <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <AppHeaderBrand />
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDiagnosticsPanel(true)}
+                className="hidden sm:flex"
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Deployment Checklist
+              </Button>
+            )}
+            <LoginButton />
           </div>
-        </header>
-      )}
-
-      {/* Always-available diagnostics button when header is hidden during active quiz */}
-      {isInActiveQuiz && (
-        <div className="fixed top-4 right-4 z-50">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleOpenPublishPanel}
-            className="shadow-lg bg-card/95 backdrop-blur-sm"
-            title="View deployment diagnostics and publishing checklist"
-          >
-            <ClipboardCheck className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Checklist</span>
-          </Button>
         </div>
-      )}
+      </header>
 
-      <main className="flex-1">
-        {!isInActiveQuiz && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <PendingUpdateBanner />
+      <main className="flex-1 container mx-auto px-4 py-6">
+        {!isAuthenticated ? (
+          <Card className="max-w-md mx-auto mt-12">
+            <CardHeader>
+              <CardTitle>Welcome to Quiz Master</CardTitle>
+              <CardDescription>
+                Please log in to access the quiz editor and management features.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                This application requires authentication to ensure secure access to quiz content and user data.
+              </p>
+              <LoginButton />
+            </CardContent>
+          </Card>
+        ) : isAdminLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        )}
-        
-        {currentView === 'editor' && isAdmin && (
-          <QuizEditor quizId={ACTIVE_QUIZ_ID} onStartQuiz={handleStartQuiz} />
-        )}
-        {currentView === 'gameplay' && (
-          <QuizGameplay
-            quizId={ACTIVE_QUIZ_ID}
-            onComplete={handleQuizComplete}
-            onStepChange={setIsInActiveQuiz}
-            onEditQuestions={isAdmin ? () => setCurrentView('editor') : undefined}
-          />
-        )}
-        {currentView === 'results' && (
-          <QuizResults
-            score={sessionScore}
-            wrongAnswers={wrongAnswers}
-            onPlayAgain={handlePlayAgain}
-            onReviewWrongAnswers={handleReviewWrongAnswers}
-            onBackToEditor={isAdmin ? () => setCurrentView('editor') : undefined}
-          />
-        )}
-        {currentView === 'wrongAnswersReview' && (
-          <WrongAnswersReview
-            wrongAnswers={wrongAnswers}
-            onBack={handleBackToResults}
-          />
+        ) : isAdmin ? (
+          <QuizEditor quizId="default" onStartQuiz={() => {}} />
+        ) : (
+          <Card className="max-w-md mx-auto mt-12">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                Access Denied
+              </CardTitle>
+              <CardDescription>
+                You do not have permission to access this application.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                This application is restricted to administrators only. If you believe you should have access, please contact the application administrator.
+              </p>
+            </CardContent>
+          </Card>
         )}
       </main>
 
-      {showDiagnostics && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 overflow-y-auto">
-          <div className="min-h-screen p-4">
-            <DeploymentDiagnosticsPanel
-              onClose={handleCloseDiagnostics}
-              focusPublishSection={focusPublishSection}
-            />
-          </div>
-        </div>
-      )}
-
       <BuildIdentityFooter />
-      <Toaster />
+
+      {/* Deployment Diagnostics Panel */}
+      {showDiagnosticsPanel && (
+        <DeploymentDiagnosticsPanel onClose={() => setShowDiagnosticsPanel(false)} />
+      )}
     </div>
   );
 }
+
+export default App;

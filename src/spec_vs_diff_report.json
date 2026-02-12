@@ -1,44 +1,58 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-12T09:31:15.158Z",
-  "summary": "REQ-1 appears largely implemented: WrongAnswersReview UI no longer includes any study-article affordance, wrong-answer entries no longer include a studyArticle field, and App view routing now omits any study-article view. REQ-2 is only partially evidenced: actor/canister ID resolution and diagnostics logic were touched, but the diff summary does not show explicit handling of the placeholder canister ID in env.json nor clear proof that the original build/deploy configuration failure is fully resolved.",
+  "generatedAt": "2026-02-12T17:37:09.201Z",
+  "summary": "The diff adds/extends in-app deployment diagnostics, runtime env.json status inspection, readiness evaluation, and a publishing checklist doc. It does not (and likely cannot, from code changes alone) perform the actual Caffeine-editor publish or guarantee production /env.json injection. The diff also includes multiple unrelated UI/quiz/theme changes not requested by the BuildRequest.",
   "missing_requirements": [
     {
-      "id": "REQ-2",
-      "requirement": "If /frontend/public/env.json contains the placeholder canister id value (\"PLACEHOLDER_BACKEND_CANISTER_ID\"), the UI clearly surfaces this as a configuration problem (via existing diagnostics/connection error UI) and provides actionable steps, rather than failing silently.",
-      "reason": "The diff shows new canister ID resolution usage and diagnostics capture, but there is no evidence in the provided file changes that the placeholder value is specifically detected and surfaced with actionable instructions. No changes to frontend/public/env.json are shown either.",
+      "id": "REQ-1",
+      "requirement": "Publish the current draft build to the live (production) deployment using the Caffeine editor publish flow (the app cannot self-publish). Ensure the publish process injects a real backend canister ID into the live /env.json so CANISTER_ID_BACKEND is not the placeholder value PLACEHOLDER_BACKEND_CANISTER_ID.",
+      "reason": "No code diff can demonstrate that a production publish was executed via the Caffeine editor, nor that the live deployment’s served /env.json was injected with a real canister ID. The changes are limited to frontend diagnostics/docs that instruct publishing rather than performing it.",
       "evidence": [
-        "frontend/src/config/index.ts",
-        "frontend/src/App.tsx"
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "requirement": "Fix the configuration issue preventing builds/deployments from running successfully, and ensure the app can be rebuilt and redeployed after the fix.",
-      "reason": "While configuration/actor creation code was modified, the diff summary does not explicitly identify the original configuration error or show concrete build/deployment config changes (e.g., env.json, dfx config, CI/build scripts) that would conclusively address a deployment failure.",
-      "evidence": [
-        "frontend/src/config/index.ts"
+        "frontend/PUBLISHING.md",
+        "frontend/src/utils/runtimeEnvStatus.ts",
+        "project_state.json"
       ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "Re-introducing or adding a visible \"Study Article\" field in the Quiz Editor (editing/saving/loading study article content).",
-      "reason": "The BuildRequest only asks to remove study-article functionality from the Wrong Answers Review flow, not to add/expand study-article editing in the quiz editor.",
+      "description": "Major quiz/editor feature additions and changes (e.g., ‘Study Article’ textarea field per question, draft persistence, image upload support, export, backup/restore, question block management).",
+      "reason": "BuildRequest explicitly states non-goal: no new product features/UI changes unrelated to publishing; these changes are unrelated to publishing/verification.",
       "evidence": [
-        "frontend-file-summaries.txt (entry for \"frontend/src/quiz/QuizEditor.tsx\")"
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "Adaptive learning scheduler/session logic changes (mastery-based repeats, spacing rules, randomized order, new counters).",
+      "reason": "Not requested; unrelated to publishing or deployment diagnostics.",
+      "evidence": [
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "Global theme/CSS and Tailwind aesthetic changes (cyber-bunker OKLCH color system updates, font/shadow utilities).",
+      "reason": "Not requested; unrelated to publish flow or canister ID injection verification.",
+      "evidence": [
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "Login button mobile-responsive sizing changes.",
+      "reason": "Not requested; unrelated to publishing/diagnostics requirements.",
+      "evidence": [
+        "frontend-file-summaries.txt"
       ]
     }
   ],
-  "confidence": 0.62,
+  "confidence": 0.74,
   "changed_files": [
     "frontend-file-summaries.txt",
+    "frontend/PUBLISHING.md",
     "frontend/src/App.tsx",
-    "frontend/src/config/index.ts",
-    "frontend/src/quiz/QuizGameplay.tsx",
-    "frontend/src/quiz/WrongAnswersReview.tsx",
-    "frontend/src/quiz/wrongAnswerTypes.ts",
+    "frontend/src/components/DeploymentDiagnosticsPanel.tsx",
+    "frontend/src/utils/liveReadiness.ts",
+    "frontend/src/utils/runtimeEnvStatus.ts",
     "project_state.json"
   ]
 }

@@ -1,11 +1,11 @@
 import type { BuildInfo } from './buildStamp';
 import type { HealthCheckResult } from '../backend';
 import { getActorConnectionInfoAsync } from './actorConnectionInfo';
-import { inspectRuntimeEnv } from './runtimeEnvStatus';
+import { getRuntimeEnvStatus } from './runtimeEnvStatus';
 
 /**
  * Formatter that generates comprehensive plain-text "Live Verification Info" report in English
- * including live URL, complete build metadata, backend canister resolution details,
+ * including live URL, complete build metadata, backend canister resolution details with manual override sources,
  * runtime env.json status with presence check, network/host configuration,
  * and clear health-check status/result section with async connection info loading.
  */
@@ -15,7 +15,7 @@ export async function shareLiveVerificationInfo(
   healthCheckError: string | null
 ): Promise<string> {
   const connectionInfo = await getActorConnectionInfoAsync();
-  const runtimeEnvStatus = await inspectRuntimeEnv();
+  const runtimeEnvStatus = getRuntimeEnvStatus();
   
   const lines: string[] = [];
   
@@ -49,8 +49,23 @@ export async function shareLiveVerificationInfo(
   lines.push('🔌 BACKEND CANISTER RESOLUTION');
   lines.push('─────────────────────────────────────────────────────────');
   lines.push(`Canister ID:       ${connectionInfo.canisterId || '(not resolved)'}`);
-  lines.push(`Resolution Source: ${connectionInfo.canisterIdSource}`);
-  lines.push(`Sources Attempted: ${connectionInfo.canisterIdSourcesAttempted.join(', ')}`);
+  
+  // Explicitly label manual override sources
+  let sourceLabel = connectionInfo.canisterIdSource;
+  if (sourceLabel === 'manual-override:url') {
+    sourceLabel = 'Manual Override (URL query parameter)';
+  } else if (sourceLabel === 'manual-override:localStorage') {
+    sourceLabel = 'Manual Override (Saved in browser)';
+  }
+  lines.push(`Resolution Source: ${sourceLabel}`);
+  
+  const sourcesAttemptedLabels = connectionInfo.canisterIdSourcesAttempted.map(s => {
+    if (s === 'manual-override:url') return 'Manual Override (URL)';
+    if (s === 'manual-override:localStorage') return 'Manual Override (localStorage)';
+    return s;
+  });
+  lines.push(`Sources Attempted: ${sourcesAttemptedLabels.join(', ')}`);
+  
   if (connectionInfo.canisterIdResolutionError) {
     lines.push(`Resolution Error:  ${connectionInfo.canisterIdResolutionError}`);
   }
@@ -58,13 +73,14 @@ export async function shareLiveVerificationInfo(
   
   lines.push('⚙️  RUNTIME ENVIRONMENT STATUS');
   lines.push('─────────────────────────────────────────────────────────');
-  lines.push(`/env.json Accessible:     ${runtimeEnvStatus.envJsonAccessible ? 'Yes' : 'No'}`);
-  lines.push(`CANISTER_ID_BACKEND Set:  ${runtimeEnvStatus.canisterIdPresent ? 'Yes' : 'No'}`);
-  lines.push(`Status: ${runtimeEnvStatus.message}`);
-  if (runtimeEnvStatus.troubleshootingSteps.length > 0) {
+  lines.push(`Load Status:              ${runtimeEnvStatus.status}`);
+  lines.push(`CANISTER_ID_BACKEND Set:  ${runtimeEnvStatus.canisterId ? 'Yes' : 'No'}`);
+  lines.push(`Is Placeholder:           ${runtimeEnvStatus.isPlaceholder ? 'Yes' : 'No'}`);
+  lines.push(`Message: ${runtimeEnvStatus.message}`);
+  if (runtimeEnvStatus.troubleshooting.length > 0) {
     lines.push('');
     lines.push('Troubleshooting Steps:');
-    runtimeEnvStatus.troubleshootingSteps.forEach((step, idx) => {
+    runtimeEnvStatus.troubleshooting.forEach((step, idx) => {
       lines.push(`  ${idx + 1}. ${step}`);
     });
   }
@@ -99,7 +115,8 @@ export async function shareLiveVerificationInfo(
   lines.push('📊 OVERALL READINESS');
   lines.push('─────────────────────────────────────────────────────────');
   const isReady = 
-    runtimeEnvStatus.canisterIdPresent && 
+    runtimeEnvStatus.status === 'loaded' &&
+    !runtimeEnvStatus.isPlaceholder &&
     connectionInfo.canisterId && 
     !connectionInfo.canisterIdResolutionError &&
     healthCheckResult !== null;
@@ -113,7 +130,7 @@ export async function shareLiveVerificationInfo(
     lines.push('Status: ⚠️  NOT READY');
     lines.push('');
     lines.push('Issues detected:');
-    if (!runtimeEnvStatus.canisterIdPresent) {
+    if (runtimeEnvStatus.status !== 'loaded' || runtimeEnvStatus.isPlaceholder) {
       lines.push('  • Runtime environment not properly configured (check /env.json)');
     }
     if (!connectionInfo.canisterId || connectionInfo.canisterIdResolutionError) {
